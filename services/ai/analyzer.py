@@ -42,8 +42,17 @@ class EmotionAnalyzer:
     
     def __init__(self, model_path="iic/SenseVoiceSmall"):
         """初始化 SenseVoice 模型"""
-        logger.info("Loading SenseVoice model...")
+        logger.info(f"Loading SenseVoice model from: {model_path}")
+        print(f"DEBUG: Starting SenseVoice model load from {model_path}...")
         
+        try:
+            from modelscope.hub.snapshot_download import snapshot_download
+            # Check if model exists or download it explicitly to show progress
+            logging.getLogger("modelscope").setLevel(logging.INFO)
+            print("DEBUG: Checking/Downloading model via modelscope...")
+        except ImportError:
+            pass
+
         self.model = AutoModel(
             model=model_path,
             vad_model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
@@ -52,6 +61,7 @@ class EmotionAnalyzer:
         )
         
         logger.info("SenseVoice model loaded successfully")
+        print("DEBUG: SenseVoice model loaded successfully!")
     
     def analyze(self, audio_bytes: bytes) -> Dict:
         """

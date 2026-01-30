@@ -37,6 +37,53 @@ pnpm dev:server
 pnpm dev:web
 ```
 
+## 开发者指南 (Manual Setup)
+如果你需要独立开发或调试各个服务，请参考以下详细步骤：
+
+### 1. AI 服务 (Python FastAPI)
+位于 `services/ai` 目录。
+```bash
+cd services/ai
+
+# 1. 创建虚拟环境
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 2. 安装依赖
+# 注意：Mac M-series 可能会遇到 torch 安装问题，建议先安装基础依赖
+pip install -r requirements.txt
+
+# 3. 生成 BLS 密钥对
+# 这将生成 3 个验证者密钥并写入项目根目录的 .env 文件
+python ../../scripts/generate_keys.py
+
+# 4. 配置环境变量
+# 将根目录 .env 同步到服务目录
+cp ../../.env .env
+
+# 5. 启动服务
+python app.py
+```
+
+### 2. Telegram Bot 服务
+位于 `services/bot` 目录。
+```bash
+cd services/bot
+
+# 1. 创建虚拟环境
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 2. 安装依赖
+pip install -r requirements.txt
+
+# 3. 配置环境变量
+# 确保目录下的 .env 包含 BOT_TOKEN（咨询管理员或 @BotFather）
+
+# 4. 启动 Bot
+python bot.py
+```
+
 3) 使用流程
 - 前端输入活动链接或关键词，抓取摘要
 - 录音并提交（自动 3 分钟上限），后端转发至 AI
