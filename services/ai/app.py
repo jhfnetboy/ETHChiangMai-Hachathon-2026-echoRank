@@ -62,6 +62,10 @@ bls_signer = None
 bot_public_key = None
 
 
+@app.get("/status")
+async def status():
+    return {"service": "EchoRank AI Backend", "ok": True}
+
 @app.on_event("startup")
 async def startup_event():
     """服务启动时初始化组件"""
