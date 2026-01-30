@@ -1,7 +1,9 @@
+import "dotenv/config";
 import express from "express";
 import multer from "multer";
 import cors from "cors";
 import fetch from "node-fetch";
+import { initSendGrid, sendRegisterEmail } from "./mail";
 
 const app = express();
 app.use(cors());
@@ -33,7 +35,21 @@ app.post("/api/register", async (req, res) => {
     res.status(400).json({ error: "missing email" });
     return;
   }
-  res.json({ message: "registration email sent" });
+  try {
+    const key = process.env.SENDGRID_API_KEY || "";
+    const from = process.env.SENDGRID_FROM || "";
+    const baseUrl = process.env.APP_BASE_URL || "";
+    if (!key || !from) {
+      res.status(500).json({ error: "sendgrid not configured" });
+      return;
+    }
+    initSendGrid(key);
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    await sendRegisterEmail(email, from, code, baseUrl);
+    res.json({ message: "registration email sent" });
+  } catch (e) {
+    res.status(500).json({ error: "send email failed" });
+  }
 });
 
 app.post("/api/analyze", upload.single("file"), async (req, res) => {
