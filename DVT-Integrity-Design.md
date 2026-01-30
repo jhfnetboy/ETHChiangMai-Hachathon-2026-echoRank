@@ -9,7 +9,7 @@
 - result_json：AI 分析的结构化结果（情感、关键词、评分输入等）
 - result_hash：对 result_json 的 SHA256 摘要
 - algo_version：分析代码/模型镜像的不可变版本标识（容器镜像 Digest/代码哈希）
-- m（消息）：domain_sep || audio_hash || result_hash || algo_version || timestamp || nonce
+- m（消息）： audio_hash || result_hash || 机器人的公钥 || 时间
 - sk_i/pk_i：第 i 个验证节点的私钥/公钥
 - σ_i：第 i 个节点对消息 m 的签名 g t
 - t-of-n：n 个验证节点中至少 t 个签名聚合后才有效
