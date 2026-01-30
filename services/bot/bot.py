@@ -19,6 +19,7 @@ INSTR_MSG = (
     "Please mention the event name, otherwise feedback is invalid."
 )
 LAST_ACTIVITY: dict[int, tuple[str, float]] = {}
+STATUS_PORT = int(os.getenv("BOT_STATUS_PORT", "8081"))
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = f"{BOT_NAME} ready"
@@ -106,4 +107,32 @@ def main():
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class StatusHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path != "/status":
+                self.send_response(404)
+                self.end_headers()
+                return
+            payload = (
+                '{"service":"bot","ok":true,"name":"%s","link":"%s"}'
+                % (BOT_NAME, TELE_URL)
+            )
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload.encode("utf-8"))
+
+    def start_status_server():
+        try:
+            srv = HTTPServer(("0.0.0.0", STATUS_PORT), StatusHandler)
+            srv.serve_forever()
+        except Exception:
+            pass
+
+    t = threading.Thread(target=start_status_server, daemon=True)
+    t.start()
     main()

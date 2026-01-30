@@ -15,6 +15,30 @@ app.use(express.json());
 const upload = multer();
 const AI_URL = process.env.AI_URL || "http://127.0.0.1:8001/analyze";
 
+app.get("/status", async (_req, res) => {
+  const now = new Date().toISOString();
+  let ai_ok = false;
+  let ai_status_url = AI_URL;
+  try {
+    const u = new URL(AI_URL);
+    u.pathname = "/status";
+    u.search = "";
+    ai_status_url = u.toString();
+    const r = await fetch(ai_status_url).catch(() => null);
+    ai_ok = !!(r && r.ok);
+  } catch {
+    ai_ok = false;
+  }
+  res.json({
+    service: "server",
+    ok: true,
+    time: now,
+    ai_url: AI_URL,
+    ai_status_url,
+    ai_ok
+  });
+});
+
 app.get("/api/activity", async (req, res) => {
   const u = req.query.url as string;
   if (!u) {
