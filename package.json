@@ -1,0 +1,14 @@
+{
+  "name": "echorank-workspace",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @echorank/web dev",
+    "build:web": "pnpm --filter @echorank/web build",
+    "preview:web": "pnpm --filter @echorank/web preview",
+    "dev:server": "pnpm --filter @echorank/server dev",
+    "build:server": "pnpm --filter @echorank/server build",
+    "start:server": "pnpm --filter @echorank/server start",
+    "dev:ai": "python3 services/ai/app.py"
+  }
+}
