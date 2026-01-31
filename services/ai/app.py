@@ -277,13 +277,22 @@ async def analyze_audio(audio: UploadFile = File(...)):
         }
         
         logger.info("✅ Request processed successfully")
-        return JSONResponse(content=response)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error processing request: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+
+        # 直接保存到 services/ai 目录
+        import json
+        debug_file = "/Users/chen/Desktop/个人背书/hackson/ETHChiangMai-Hachathon-2026/services/ai/ai_response_debug.json"
+
+        with open(debug_file, "w", encoding="utf-8") as f:
+            json.dump(response, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"[DEBUG] Response saved to ai_response_debug.json")
+            return JSONResponse(content=response)
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error processing request: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/verify")

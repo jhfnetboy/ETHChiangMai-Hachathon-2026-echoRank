@@ -8,6 +8,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, Con
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN", "")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://127.0.0.1:8001")
 BOT_NAME = os.getenv("BOT_NAME", "echoRankBot")
 TELE_URL = os.getenv("Tele_URL", "")
 INTRO_MSG = "echoRank is a Event Echo Tool, which powerd by Decentralized Community AI. More informain here: https://github.com/jhfnetboy/ETHChiangMai-Hachathon-2026-echoRank"
@@ -64,7 +65,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     f = await context.bot.get_file(file_id)
     b = await f.download_as_bytearray()
-    files = {"file": ("feedback.ogg", bytes(b))}
+    files = {"audio": ("voice.ogg", bytes(b), "audio/ogg")}
     user_id = update.effective_user.id if update.effective_user else 0
     window_ms = 10 * 60 * 1000
     import time as _t
@@ -75,19 +76,65 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         activity_name = LAST_ACTIVITY[user_id][0]
     try:
         r = requests.post(
-            f"{BACKEND_URL}/api/analyze",
+            f"{AI_SERVICE_URL}/analyze",
             files=files,
             data={"session_id": session_id, "user_id": str(user_id), "activity_name": activity_name},
             timeout=30
         )
+         # 检查响应状态
+        if r.status_code != 200:
+            print(f"[Bot] Error: AI returned status {r.status_code}")
+            print(f"[Bot] Response: {r.text}")
+            await m.reply_text(f"analyze failed (HTTP {r.status_code})")
+            return
+        
         data = r.json()
-        score = data.get("score", "?")
-        sentiment = data.get("sentiment", "?")
-        keywords = data.get("keywords", [])
+        print(f"[Bot] AI Response: {data}")
+        
+        # 修复 3: 适配 AI 服务的返回格式
+        if not data.get("success"):
+            await m.reply_text("analyze failed (AI error)")
+            return
+
+        # 从 result 对象中提取数据
+        result = data.get("result", {})
+        
+        # emotion -> sentiment, intensity -> score
+        sentiment = result.get("emotion", "?")
+        score = result.get("intensity", 0)
+        keywords = result.get("keywords", [])
+        confidence = result.get("confidence", 0)
+        transcript = result.get("transcript", "")
+        
+        # 格式化关键词
         ks = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
-        await m.reply_text(f"score: {score}\nsentiment: {sentiment}\nkeywords: {ks}")
-    except Exception:
-        await m.reply_text("analyze failed")
+        
+        # 构造回复消息
+        reply_msg = f"📊 分析结果\n"
+        reply_msg += f"情绪(sentiment): {sentiment}\n"
+        reply_msg += f"分数(score): {score:.0f}\n"  # 转换为整数显示
+        reply_msg += f"置信度: {confidence:.2f}\n"
+        reply_msg += f"关键词(keywords): {ks}\n"
+        
+        if transcript:
+            reply_msg += f"\n📝 识别文本: {transcript}\n"
+        
+        if activity_name:
+            reply_msg += f"\n🎯 活动: {activity_name}"
+        
+        await m.reply_text(reply_msg)
+        
+    except requests.exceptions.Timeout:
+        print("[Bot] Error: Request timeout")
+        await m.reply_text("analyze failed (timeout)")
+    except requests.exceptions.ConnectionError as e:
+        print(f"[Bot] Error: Cannot connect to AI service: {e}")
+        await m.reply_text(f"analyze failed (connection error - is AI service running at {AI_SERVICE_URL}?)")
+    except Exception as e:
+        print(f"[Bot] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        await m.reply_text(f"analyze failed: {str(e)}")
 
 def main():
     if not TOKEN:
