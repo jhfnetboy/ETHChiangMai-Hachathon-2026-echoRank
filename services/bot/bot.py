@@ -1,184 +1,224 @@
+import logging
 import os
 import asyncio
-import requests
-from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+from dotenv import load_dotenv
+import psycopg2
+from urllib.parse import urlparse
 
-load_dotenv()
-TOKEN = os.getenv("BOT_TOKEN", "")
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
-AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://127.0.0.1:8001")
-BOT_NAME = os.getenv("BOT_NAME", "echoRankBot")
-TELE_URL = os.getenv("Tele_URL", "")
-INTRO_MSG = "echoRank is a Event Echo Tool, which powerd by Decentralized Community AI. More informain here: https://github.com/jhfnetboy/ETHChiangMai-Hachathon-2026-echoRank"
-INSTR_MSG = (
-    "👋 欢迎使用 echoRank bot\n"
-    "使用方式：请按住对话框右侧的麦克风说话；后台 AI 返回分析结果并自动上链；务必提及你反馈的活动名称，否则反馈无效。\n"
-    "EN: Welcome to echoRank bot.\n"
-    "Press the microphone button to speak. AI will analyze and record on-chain.\n"
-    "Please mention the event name, otherwise feedback is invalid."
+# Load environment variables from local .env
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(env_path)
+
+# Configuration
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_USER = os.getenv("POSTGRES_USER", "postgres") # Default for brew
+DB_PASS = os.getenv("POSTGRES_PASSWORD", "")
+DB_NAME = os.getenv("POSTGRES_DB", "echorank_crawler")
+
+# Logging Setup
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
 )
-LAST_ACTIVITY: dict[int, tuple[str, float]] = {}
-STATUS_PORT = int(os.getenv("BOT_STATUS_PORT", "8081"))
+
+# DB Connection
+def get_db_connection():
+    return psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASS,
+        dbname=DB_NAME
+    )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = f"{BOT_NAME} ready"
-    if TELE_URL:
-        msg += f" ({TELE_URL})"
-    await update.message.reply_text(msg)
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="👋 Welcome to EchoRank Bot!\n\nI am your decentralized event assistant.\n\n**Submit Mode:**\n/submit <url> - Add an event\n\n**Discover Mode:**\nType 'Event' or '活动' to find things to do."
+    )
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    m = update.message
-    if not m or not m.text:
-        return
-    chat_type = update.effective_chat.type if update.effective_chat else ""
-    text_lower = m.text.lower()
-    bot_un = (context.bot.username or BOT_NAME).lower()
-    mentioned = f"@{bot_un}" in text_lower or BOT_NAME.lower() in text_lower
-    if chat_type == "private":
-        # 记录最近活动名（简单起见，使用整段文本）
-        if update.effective_user and m.text:
-            LAST_ACTIVITY[update.effective_user.id] = (m.text.strip(), __import__("time").time())
-        await m.reply_text(INSTR_MSG)
-        return
-    # group/supergroup: only respond when mentioned
-    if mentioned or ("/help" in text_lower and mentioned) or ("help" in text_lower and mentioned):
-        await m.reply_text(INSTR_MSG)
+import httpx
+from bs4 import BeautifulSoup
+import json
+import sys
+import os
 
-async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    m = update.message
-    if m is None:
+# Add project root to sys.path to allow imports from services using absolute paths
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
+from services.ai.validator import validate_event_content
+
+# ... (Previous imports remain, ensure clean merge)
+
+async def submit_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="usage: /submit <url>")
         return
-    chat_type = update.effective_chat.type if update.effective_chat else ""
-    # group/supergroup: ignore voice
-    if chat_type != "private":
-        return
-    file_id = None
-    if m.voice:
-        file_id = m.voice.file_id
-    elif m.audio:
-        file_id = m.audio.file_id
-    elif m.video_note:
-        file_id = m.video_note.file_id
-    if not file_id:
-        return
-    f = await context.bot.get_file(file_id)
-    b = await f.download_as_bytearray()
-    files = {"audio": ("voice.ogg", bytes(b), "audio/ogg")}
-    user_id = update.effective_user.id if update.effective_user else 0
-    window_ms = 10 * 60 * 1000
-    import time as _t
-    bucket = int(_t.time() * 1000) // window_ms * window_ms
-    session_id = f"{user_id}-{bucket}"
-    activity_name = ""
-    if user_id in LAST_ACTIVITY:
-        activity_name = LAST_ACTIVITY[user_id][0]
+
+    url = context.args[0]
+    
+    # Basic URL Format Validation
     try:
-        r = requests.post(
-            f"{AI_SERVICE_URL}/analyze",
-            files=files,
-            timeout=30
-        )
-         # 检查响应状态
-        if r.status_code != 200:
-            print(f"[Bot] Error: AI returned status {r.status_code}")
-            print(f"[Bot] Response: {r.text}")
-            await m.reply_text(f"analyze failed (HTTP {r.status_code})")
-            return
-        
-        data = r.json()
-        print(f"[Bot] AI Response: {data}")
-        
-        # 修复 3: 适配 AI 服务的返回格式
-        if not data.get("success"):
-            await m.reply_text("analyze failed (AI error)")
-            return
+        result = urlparse(url)
+        if not all([result.scheme, result.netloc]):
+            raise ValueError
+    except:
+         await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Invalid URL format.")
+         return
 
-        # 从 result 对象中提取数据
-        result = data.get("result", {})
+    status_msg = await context.bot.send_message(chat_id=update.effective_chat.id, text=f"🔍 Analyzing URL: {url}...")
+
+    # 1. Fetch Content (Lightweight Scrape)
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+            resp = await client.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            resp.raise_for_status()
+            
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        # Extract title and body text for AI
+        page_title = soup.title.string if soup.title else ""
+        body_text = soup.get_text(separator=' ', strip=True)[:4000] # Limit context
+        full_text = f"Title: {page_title}\n\nContent: {body_text}"
         
-        # emotion -> sentiment, intensity -> score
-        sentiment = result.get("emotion", "?")
-        score = result.get("intensity", 0)
-        keywords = result.get("keywords", [])
-        confidence = result.get("confidence", 0)
-        transcript = result.get("transcript", "")
-        
-        # 格式化关键词
-        ks = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
-        
-        # 构造回复消息
-        reply_msg = f"📊 分析结果\n"
-        reply_msg += f"情绪(sentiment): {sentiment}\n"
-        reply_msg += f"分数(score): {score:.0f}\n"  # 转换为整数显示
-        reply_msg += f"置信度: {confidence:.2f}\n"
-        reply_msg += f"关键词(keywords): {ks}\n"
-        
-        if transcript:
-            reply_msg += f"\n📝 识别文本: {transcript}\n"
-        
-        if activity_name:
-            reply_msg += f"\n🎯 活动: {activity_name}"
-        
-        await m.reply_text(reply_msg)
-        
-    except requests.exceptions.Timeout:
-        print("[Bot] Error: Request timeout")
-        await m.reply_text("analyze failed (timeout)")
-    except requests.exceptions.ConnectionError as e:
-        print(f"[Bot] Error: Cannot connect to AI service: {e}")
-        await m.reply_text(f"analyze failed (connection error - is AI service running at {AI_SERVICE_URL}?)")
     except Exception as e:
-        print(f"[Bot] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        await m.reply_text(f"analyze failed: {str(e)}")
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ Failed to fetch URL: {str(e)}")
+        return
 
-def main():
-    if not TOKEN:
-        raise RuntimeError("BOT_TOKEN missing")
-    # Ensure event loop exists for Python 3.14+
+    # 2. AI Validation
     try:
-        import asyncio
-        asyncio.get_event_loop()
-    except Exception:
-        import asyncio
-        asyncio.set_event_loop(asyncio.new_event_loop())
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", handle_text))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
-    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO | filters.VIDEO_NOTE, handle_voice))
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"🤖 AI Validating (Gemini)...")
+        ai_result = validate_event_content(full_text)
+        
+        if not ai_result:
+            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="❌ AI Validation failed (Error/Quota).")
+            return
+            
+        # Check Validity
+        is_valid = ai_result.get('valid', False)
+        tags = ai_result.get('tags', {})
+        summary = ai_result.get('summary', 'No summary.')
+        metadata = ai_result.get('metadata', {})
+        
+        extracted_title = metadata.get('title') or page_title
+        extracted_loc = metadata.get('location')
+        extracted_time = metadata.get('time')
+        
+    except Exception as e:
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ AI Error: {str(e)}")
+        return
 
-if __name__ == "__main__":
-    import threading
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-    class StatusHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            if self.path != "/status":
-                self.send_response(404)
-                self.end_headers()
-                return
-            payload = (
-                '{"service":"bot","ok":true,"name":"%s","link":"%s"}'
-                % (BOT_NAME, TELE_URL)
+    # 3. DB Insertion
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Check if exists
+        cur.execute("SELECT id FROM activities WHERE url = %s", (url,))
+        exists = cur.fetchone()
+        
+        if exists:
+             await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"⚠️ Event already exists! (ID: {exists[0]})")
+        else:
+            # Insert with AI Data
+            # Note: start_time is skipped for now as we don't strictly parse "tomorrow 10am" to timestamp yet.
+            # We store extracted_time in metadata JSON.
+            
+            cur.execute(
+                """
+                INSERT INTO activities 
+                (url, title, location, source_domain, validation_status, validation_tags, ai_summary, metadata) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
+                RETURNING id
+                """,
+                (
+                    url, 
+                    extracted_title[:255] if extracted_title else "Untitled",
+                    extracted_loc,
+                    result.netloc, 
+                    is_valid, 
+                    json.dumps(tags), 
+                    summary,
+                    json.dumps({"raw_time": extracted_time, "full_metadata": metadata})
+                )
             )
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload.encode("utf-8"))
+            activity_id = cur.fetchone()[0]
+            conn.commit()
+            
+            # 4. Final Reply
+            tag_str = ", ".join([k for k,v in tags.items() if v])
+            emoji = "✅" if is_valid else "❌"
+            final_text = (
+                f"{emoji} **Event Processed**\n"
+                f"**ID:** {activity_id}\n"
+                f"**Title:** {extracted_title}\n"
+                f"**Tags:** {tag_str}\n"
+                f"**Status:** {'Approved' if is_valid else 'Rejected (Need 2/3 tags)'}\n\n"
+                f"**Summary:** {summary}\n"
+            )
+            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=final_text, parse_mode='Markdown')
+            
+            
+    except Exception as e:
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ DB Error: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
 
-    def start_status_server():
-        try:
-            srv = HTTPServer(("0.0.0.0", STATUS_PORT), StatusHandler)
-            srv.serve_forever()
-        except Exception:
-            pass
+async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.lower()
+    if not (text == "event" or text == "活动" or text == "/list"):
+        return
 
-    t = threading.Thread(target=start_status_server, daemon=True)
-    t.start()
-    main()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Fetch validated events
+        cur.execute("""
+            SELECT id, title, location, ai_summary 
+            FROM activities 
+            WHERE validation_status = TRUE 
+            ORDER BY id DESC LIMIT 10
+        """)
+        rows = cur.fetchall()
+        
+        if not rows:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="📭 No upcoming events found.")
+            return
+
+        msg = "📅 **Upcoming Events**\n\n"
+        for row in rows:
+            # row: id, title, location, summary
+            msg += f"**{row[0]}. {row[1]}**\n📍 {row[2]}\n_{row[3]}_\n\n"
+            
+        msg += "👇 **Reply with the Event ID number to give feedback.**"
+        
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=msg, parse_mode='Markdown')
+        
+    except Exception as e:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"❌ Error fetching events: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
+
+
+if __name__ == '__main__':
+    if not BOT_TOKEN:
+        print("Error: BOT_TOKEN not found in .env")
+        exit(1)
+        
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    start_handler = CommandHandler('start', start)
+    submit_handler = CommandHandler('submit', submit_url)
+    list_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), list_events)
+    
+    application.add_handler(start_handler)
+    application.add_handler(submit_handler)
+    application.add_handler(list_handler)
+    
+    print("Bot is running...")
+    application.run_polling()
