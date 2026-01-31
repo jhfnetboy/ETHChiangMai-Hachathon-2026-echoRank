@@ -1,0 +1,25 @@
+{
+  "name": "@echorank/crawler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "crawlee": "^3.7.3",
+    "playwright": "^1.41.1",
+    "pg": "^8.11.3",
+    "dotenv": "^16.4.1",
+    "@google/generative-ai": "^0.2.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

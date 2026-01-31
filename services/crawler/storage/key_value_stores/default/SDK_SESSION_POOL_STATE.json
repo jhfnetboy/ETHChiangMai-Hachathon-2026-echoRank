@@ -1,0 +1,83 @@
+{
+  "usableSessionsCount": 2,
+  "retiredSessionsCount": 0,
+  "sessions": [
+    {
+      "id": "session_qKIthmg8uO",
+      "cookieJar": {
+        "version": "tough-cookie@6.0.0",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": []
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2026-01-31T04:47:00.408Z",
+      "createdAt": "2026-01-31T03:57:00.408Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_QCU2gIGN55",
+      "cookieJar": {
+        "version": "tough-cookie@6.0.0",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": [
+          {
+            "key": "luma.did",
+            "value": "bbi1hvuunih361ltcu5nqtn4x9rh7m",
+            "expires": "2027-03-07T03:57:03.433Z",
+            "domain": "luma.com",
+            "path": "/",
+            "secure": true,
+            "httpOnly": true,
+            "hostOnly": false,
+            "creation": "2026-01-31T03:57:05.694Z",
+            "lastAccessed": "2026-01-31T03:57:05.694Z"
+          },
+          {
+            "key": "luma.first-page",
+            "value": "%2Fchiang-mai",
+            "expires": "2027-03-07T03:57:03.433Z",
+            "domain": "luma.com",
+            "path": "/",
+            "secure": true,
+            "httpOnly": true,
+            "hostOnly": false,
+            "creation": "2026-01-31T03:57:05.695Z",
+            "lastAccessed": "2026-01-31T03:57:05.695Z"
+          },
+          {
+            "key": "__cf_bm",
+            "value": "vIBU9UW_ebEJ9Yd.NxvgppbYjDVvnSHqd5Bv4H9lxJE-1769831823-1.0.1.1-Jb2puhXFZJRG1IWdVlMDE0zNPfx5I6VDRips0CcHWXCbg_i5woCZAIbhz3XK6DxG18KqZyE7vmpffiFB5Nms6n_pPKBv13BF3s7lJcHitrM",
+            "expires": "2026-01-31T04:27:03.433Z",
+            "domain": "luma.com",
+            "path": "/",
+            "secure": true,
+            "httpOnly": true,
+            "hostOnly": false,
+            "creation": "2026-01-31T03:57:05.695Z",
+            "lastAccessed": "2026-01-31T03:57:05.695Z"
+          }
+        ]
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2026-01-31T04:47:00.414Z",
+      "createdAt": "2026-01-31T03:57:00.414Z",
+      "usageCount": 1,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    }
+  ]
+}

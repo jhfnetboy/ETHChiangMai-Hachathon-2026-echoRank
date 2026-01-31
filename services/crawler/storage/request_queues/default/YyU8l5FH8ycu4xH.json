@@ -1,0 +1,9 @@
+{
+	"id": "YyU8l5FH8ycu4xH",
+	"json": "{\"id\":\"YyU8l5FH8ycu4xH\",\"url\":\"https://lu.ma/chiang-mai\",\"loadedUrl\":\"https://luma.com/discover\",\"uniqueKey\":\"https://lu.ma/chiang-mai\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":4}},\"handledAt\":\"2026-01-31T03:57:06.216Z\"}",
+	"method": "GET",
+	"orderNo": null,
+	"retryCount": 0,
+	"uniqueKey": "https://lu.ma/chiang-mai",
+	"url": "https://lu.ma/chiang-mai"
+}
