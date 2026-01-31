@@ -78,7 +78,6 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r = requests.post(
             f"{AI_SERVICE_URL}/analyze",
             files=files,
-            data={"session_id": session_id, "user_id": str(user_id), "activity_name": activity_name},
             timeout=30
         )
          # 检查响应状态

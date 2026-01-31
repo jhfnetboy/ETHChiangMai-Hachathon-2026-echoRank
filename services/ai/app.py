@@ -15,7 +15,7 @@ import os
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
 
-# 导入自定义模块（优雅降级）
+# 导入自定义模块(优雅降级)
 try:
     from analyzer import EmotionAnalyzer
     ANALYZER_AVAILABLE = True
@@ -47,7 +47,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 配置 CORS（允许前端访问）
+# 配置 CORS(允许前端访问)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 生产环境应该限制具体域名
@@ -56,7 +56,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 全局变量：存储初始化的组件
+# 全局变量:存储初始化的组件
 emotion_analyzer = None
 bls_signer = None
 bot_public_key = None
@@ -65,6 +65,7 @@ bot_public_key = None
 @app.get("/status")
 async def status():
     return {"service": "EchoRank AI Backend", "ok": True}
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -92,7 +93,7 @@ async def startup_event():
         try:
             logger.info("Initializing BLS signer...")
             
-            # 从环境变量读取私钥（使用第一个验证者的密钥）
+            # 从环境变量读取私钥(使用第一个验证者的密钥)
             validator_sk = os.getenv("VALIDATOR_1_SK")
             if not validator_sk:
                 raise ValueError("VALIDATOR_1_SK not found in .env file")
@@ -147,10 +148,10 @@ async def health_check():
 @app.post("/analyze")
 async def analyze_audio(audio: UploadFile = File(...)):
     """
-    接收语音文件，进行情感分析并返回签名结果
+    接收语音文件,进行情感分析并返回签名结果
     
     请求:
-        - audio: 音频文件（支持 wav, mp3, m4a, ogg 等格式）
+        - audio: 音频文件(支持 wav, mp3, m4a, ogg 等格式)
     
     响应:
         {
@@ -161,7 +162,7 @@ async def analyze_audio(audio: UploadFile = File(...)):
                 "confidence": 0.92,
                 "keywords": ["活动", "很棒"],
                 "events": ["applause"],
-                "transcript": "这次活动很棒！",
+                "transcript": "这次活动很棒!",
                 "language": "zh"
             },
             "crypto": {
@@ -247,7 +248,7 @@ async def analyze_audio(audio: UploadFile = File(...)):
         signature_hex = signature.hex()
         logger.info(f"Signature: {signature_hex[:16]}...")
         
-        # 9. 验证签名（自检）
+        # 9. 验证签名(自检)
         is_valid = BLSSigner.verify_signature(bls_signer.pk, message, signature)
         if not is_valid:
             logger.error("❌ Signature verification failed!")
@@ -277,22 +278,16 @@ async def analyze_audio(audio: UploadFile = File(...)):
         }
         
         logger.info("✅ Request processed successfully")
-
-        # 直接保存到 services/ai 目录
-        import json
-        debug_file = "/Users/chen/Desktop/个人背书/hackson/ETHChiangMai-Hachathon-2026/services/ai/ai_response_debug.json"
-
-        with open(debug_file, "w", encoding="utf-8") as f:
-            json.dump(response, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"[DEBUG] Response saved to ai_response_debug.json")
-            return JSONResponse(content=response)
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"❌ Error processing request: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=str(e))
+        
+        return response
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/verify")
@@ -305,15 +300,15 @@ async def verify_signature(
     public_key: str
 ):
     """
-    验证签名的独立端点（可选功能）
+    验证签名的独立端点(可选功能)
     
     参数:
         - audio_hash: 音频哈希
         - result_hash: 结果哈希
         - timestamp: 时间戳
         - nonce: 随机数
-        - signature: 签名（十六进制）
-        - public_key: 公钥（十六进制）
+        - signature: 签名(十六进制)
+        - public_key: 公钥(十六进制)
     
     返回:
         {"valid": true/false}
@@ -367,3 +362,5 @@ if __name__ == "__main__":
         port=8001,       # 端口号
         log_level="info"
     )
+
+    
