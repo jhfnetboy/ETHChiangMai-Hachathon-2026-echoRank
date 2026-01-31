@@ -52,10 +52,88 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from services.ai.validator import validate_event_content
+from services.ai.summarizer import generate_community_report
 
 # ... (Previous imports remain, ensure clean merge)
 
+async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="usage: /report <activity_id>")
+        return
+
+    try:
+        activity_id = int(context.args[0])
+    except:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Activity ID must be a number.")
+        return
+
+    status_msg = await context.bot.send_message(chat_id=update.effective_chat.id, text=f"📊 Generating community report for Activity #{activity_id}...")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # 1. Get Activity Title
+        cur.execute("SELECT title FROM activities WHERE id = %s", (activity_id,))
+        act = cur.fetchone()
+        if not act:
+            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ Activity #{activity_id} not found.")
+            return
+        
+        event_title = act[0]
+
+        # 2. Get All Feedbacks
+        cur.execute("SELECT transcription, sentiment_score, keywords FROM feedbacks WHERE activity_id = %s", (activity_id,))
+        rows = cur.fetchall()
+        
+        if not rows:
+             await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"📭 No feedback recorded yet for **{event_title}**.")
+             return
+
+        feedbacks = []
+        for r in rows:
+            feedbacks.append({
+                "transcription": r[0],
+                "sentiment": r[1],
+                "keywords": r[2] # Stringified JSON in DB
+            })
+
+        # 3. AI Summarization
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"🤖 AI Summarizing {len(feedbacks)} feedbacks...")
+        
+        report_data = generate_community_report(event_title, feedbacks)
+        
+        if not report_data or isinstance(report_data, str):
+             await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ Failed to generate report. ({report_data})")
+             return
+
+        # 4. Format Output
+        summary = report_data.get('sentiment_report', 'No summary.')
+        cloud = report_data.get('word_cloud', [])
+        score = report_data.get('community_score', 0)
+        
+        # Color indicator based on score
+        emoji = "🔴" if score < 40 else ("🟡" if score < 70 else "🟢")
+        cloud_str = ", ".join(cloud)
+        
+        report_text = (
+            f"📈 **Community Report: {event_title}**\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🌟 **Overall Score:** {emoji} {score}/100\n\n"
+            f"📝 **Summary:**\n{summary}\n\n"
+            f"☁️ **Word Cloud:**\n`{cloud_str}`\n\n"
+            f"👥 Based on {len(feedbacks)} participants."
+        )
+        
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=report_text, parse_mode='Markdown')
+
+    except Exception as e:
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ Error: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
+
 async def submit_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     if not context.args:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="usage: /submit <url>")
         return
@@ -323,12 +401,14 @@ if __name__ == '__main__':
     
     start_handler = CommandHandler('start', start)
     submit_handler = CommandHandler('submit', submit_url)
+    report_handler = CommandHandler('report', report_command)
     list_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), list_events)
     # Generic message handler for Numbers and Voice
     msg_handler = MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, handle_message)
     
     application.add_handler(start_handler)
     application.add_handler(submit_handler)
+    application.add_handler(report_handler)
     application.add_handler(list_handler)
     application.add_handler(msg_handler)
     
