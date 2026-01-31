@@ -1,108 +1,165 @@
-import { PlaywrightCrawler, Dataset } from 'crawlee';
-import { initDB } from './db.js';
-import pool from './db.js';
+import { PlaywrightCrawler } from 'crawlee';
+import { chromium } from 'playwright';
+import { Log } from 'crawlee';
+import pool, { initDB } from './db';
+import { ScraperFactory } from './scrapers/factory';
+import { CrawlerEvent } from './scrapers/base';
 import dotenv from 'dotenv';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 dotenv.config();
 
-// Simple rule cache (in-memory for MVP, Redis for scale)
-const ruleCache: Record<string, any> = {};
+const log = new Log({ prefix: 'Scheduler' });
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Configuration
+const DEFAULT_SEED_URL = 'https://lu.ma/search?q=chiang+mai';
+const DEFAULT_STRATEGY = 'LUMA_SEARCH_V2'; // Strict serial for now to avoid bans
+const POLL_INTERVAL_MS = 10000; // Check DB every 10s
+const MAX_CONCURRENCY = 2; // Limit parallel pages
 
-import { generateSelectorsWithAI, ScrapingRule } from './rag-parser.js';
-
-async function getOrGenerateRule(domain: string, htmlSnippet: string) {
-    if (ruleCache[domain]) return ruleCache[domain];
-
-    // Check DB
-    const res = await pool.query('SELECT * FROM scraping_rules WHERE domain = $1', [domain]);
-    if (res.rows.length > 0) {
-        ruleCache[domain] = res.rows[0];
-        return res.rows[0];
-    }
-
-    // Generate with AI
-    console.log(`🤖 Generating rules for ${domain} with AI...`);
-    const newRule = await generateSelectorsWithAI(domain, htmlSnippet);
-    
-    // Save to DB
-    await pool.query(
-        `INSERT INTO scraping_rules (domain, event_card_selector, title_selector, date_selector, location_selector, link_selector)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [domain, newRule.event_card_selector, newRule.title_selector, newRule.date_selector, newRule.location_selector, newRule.link_selector]
-    );
-
-    ruleCache[domain] = newRule;
-    return newRule;
-}
-
-const crawler = new PlaywrightCrawler({
-    headless: true, // Set to false to see the browser
-    maxRequestsPerCrawl: 50,
-    async requestHandler({ page, request, log }) {
-        log.info(`Processing ${request.url}...`);
-        
-        const domain = new URL(request.url).hostname;
-        
-        // 1. Get Rules (Adaptive)
-        // Extract a representative snippet (e.g., first 2000 chars of body) for AI analysis if needed
-        const content = await page.content(); 
-        const rule = await getOrGenerateRule(domain, content.substring(0, 5000));
-        
-        log.info(`Using rules for ${domain}:`, rule);
-
-        // 2. Scrape Data
-        const events = await page.$$eval(rule.event_card_selector, (cards: any[], r: any) => {
-            return cards.map(card => {
-                const title = card.querySelector(r.title_selector)?.innerText?.trim();
-                const date = card.querySelector(r.date_selector)?.innerText?.trim();
-                const location = card.querySelector(r.location_selector)?.innerText?.trim();
-                const link = card.querySelector(r.link_selector)?.href;
-                
-                return { title, date, location, link };
-            }).filter(e => e.title && e.link); // Basic filter
-        }, rule);
-
-        log.info(`Found ${events.length} events on ${request.url}`);
-
-        // 3. Save to DB
-        // For loop to save each event (basic upsert)
-        for (const event of events) {
-            try {
-                // Ensure URL is absolute
-                const absoluteUrl = new URL(event.link, request.url).href;
-                
-                await pool.query(
-                    `INSERT INTO activities (title, location, url, source_domain, raw_html)
-                     VALUES ($1, $2, $3, $4, $5)
-                     ON CONFLICT (url) DO UPDATE SET 
-                     title = EXCLUDED.title, 
-                     location = EXCLUDED.location,
-                     last_updated = CURRENT_TIMESTAMP`,
-                    [event.title, event.location, absoluteUrl, domain, JSON.stringify(event)]
-                );
-            } catch (err) {
-                log.error(`Failed to save event: ${event.title}`, err as any);
-            }
+async function seedDataSources() {
+    const client = await pool.connect();
+    try {
+        const res = await client.query('SELECT COUNT(*) FROM data_sources');
+        if (parseInt(res.rows[0].count) === 0) {
+            log.info('🌱 Seeding default data sources...');
+            await client.query(
+                `INSERT INTO data_sources (url, frequency_hours, strategy_key) VALUES ($1, $2, $3)`,
+                [DEFAULT_SEED_URL, 4, DEFAULT_STRATEGY]
+            );
         }
-    },
-});
-
-// Entry Point
-async function main() {
-    await initDB();
-    
-    // Add start URLs
-    await crawler.run([
-        'https://lu.ma/chiang-mai', // Example
-        // 'https://devfolio.co/hackathons', 
-    ]);
-    
-    console.log('✅ Crawl finished.');
-    process.exit(0);
+    } finally {
+        client.release();
+    }
 }
 
-main();
+async function getDueSources() {
+    // Select sources where last_crawled_at is null OR it's been longer than frequency_hours
+    const query = `
+        SELECT * FROM data_sources 
+        WHERE is_active = TRUE 
+        AND (
+            last_crawled_at IS NULL 
+            OR last_crawled_at < NOW() - (frequency_hours || ' hours')::INTERVAL
+        )
+        ORDER BY last_crawled_at ASC NULLS FIRST
+        LIMIT 1
+    `;
+    const res = await pool.query(query);
+    if (res.rows.length === 0) {
+        // console.log('DEBUG: No due sources found.'); 
+    } else {
+        console.log(`DEBUG: Found ${res.rows.length} due sources. URL: ${res.rows[0].url}, Key: ${res.rows[0].strategy_key}`);
+    }
+    return res.rows;
+}
+
+async function saveEvents(events: CrawlerEvent[]) {
+    if (events.length === 0) return;
+    
+    const client = await pool.connect();
+    try {
+        for (const event of events) {
+            await client.query(
+                `INSERT INTO activities (title, start_time, end_time, location, url, source_domain, raw_html, metadata)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 ON CONFLICT (url) DO UPDATE SET 
+                 title = EXCLUDED.title, 
+                 start_time = EXCLUDED.start_time,
+                 location = EXCLUDED.location,
+                 metadata = EXCLUDED.metadata,
+                 last_updated = CURRENT_TIMESTAMP`,
+                [
+                    event.title, 
+                    event.start_time, 
+                    event.end_time, 
+                    event.location, 
+                    event.url, 
+                    event.source_domain, 
+                    event.raw_html, 
+                    JSON.stringify(event.metadata)
+                ]
+            );
+        }
+        log.info(`💾 Saved/Updated ${events.length} events to DB.`);
+    } catch (err) {
+        log.error('DB Save Error', err);
+    } finally {
+        client.release();
+    }
+}
+
+async function updateSourceStatus(id: number) {
+    await pool.query(`UPDATE data_sources SET last_crawled_at = NOW() WHERE id = $1`, [id]);
+}
+
+async function runScheduler() {
+    await initDB();
+    await seedDataSources();
+
+    log.info('🚀 Crawler Scheduler Started. Polling for tasks...');
+
+    while (true) {
+        try {
+            const sources = await getDueSources();
+            
+            if (sources.length === 0) {
+                log.info('💤 No tasks due. Sleeping...');
+                await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+                continue;
+            }
+
+            const source = sources[0];
+            log.info(`▶️ Starting crawl for [${source.strategy_key}] ${source.url}`);
+
+            // Instantiate Factory
+            const scraper = ScraperFactory.getScraper(source.strategy_key);
+
+            // Using Playwright directly or Crawlee? 
+            // The ScraperStrategy expects a Page. We can use PlaywrightCrawler to manage the browser.
+            const crawler = new PlaywrightCrawler({
+                requestHandler: async ({ page, request }) => {
+                    log.info(`Processing ${request.url}`);
+                    const events = await scraper.scrape(page, request.url);
+                    log.info(`✅ extracted ${events.length} events from ${request.url}`);
+                    await saveEvents(events);
+                },
+                maxConcurrency: MAX_CONCURRENCY,
+                headless: true,
+                useSessionPool: false,
+                proxyConfiguration: undefined,
+                launchContext: {
+                    useChrome: true,
+                    launchOptions: {
+                        args: [
+                            '--disable-blink-features=AutomationControlled', 
+                            '--no-sandbox', 
+                            '--disable-setuid-sandbox',
+                            '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        ],
+                        ignoreDefaultArgs: ['--enable-automation'],
+                    }
+                },
+                preNavigationHooks: [
+                    async ({ page }) => {
+                        await page.addInitScript(() => {
+                            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                        });
+                    }
+                ]
+            });
+
+            await crawler.run([source.url]);
+            
+            await updateSourceStatus(source.id);
+            log.info(`✅ Task finished for ${source.url}`);
+
+        } catch (error) {
+            log.error('Scheduler Loop Error:', error);
+            // Sleep to prevent tight error loop
+            await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        }
+    }
+}
+
+// Start
+runScheduler().catch(console.error);

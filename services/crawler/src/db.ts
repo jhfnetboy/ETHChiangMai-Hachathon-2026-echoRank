@@ -46,6 +46,19 @@ export async function initDB() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
+
+        // Table: data_sources (Configurable Crawl Targets)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS data_sources (
+                id SERIAL PRIMARY KEY,
+                url TEXT UNIQUE NOT NULL,
+                frequency_hours INT DEFAULT 24,
+                strategy_key VARCHAR(50) NOT NULL,
+                last_crawled_at TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
         
         console.log('✅ Database tables initialized');
     } catch (err) {
