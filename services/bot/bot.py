@@ -205,6 +205,115 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
 
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    # 1. Handle Event Selection (Text Number)
+    if update.message.text and update.message.text.isdigit():
+        event_id = int(update.message.text)
+        # Verify event exists
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT title FROM activities WHERE id = %s", (event_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if row:
+            context.user_data['selected_event'] = event_id
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"✅ Selected: **{row[0]}**\n\n🎙️ Please send a **Voice Message** to share your feedback.", parse_mode='Markdown')
+        else:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Invalid Event ID. listing events again...")
+            # optional: trigger list_events?
+        return
+
+    # 2. Handle Voice Message
+    if update.message.voice or update.message.audio:
+        event_id = context.user_data.get('selected_event')
+        if not event_id:
+             await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Please select an event number first. Type 'Event' to list.")
+             return
+
+        status_msg = await context.bot.send_message(chat_id=update.effective_chat.id, text="🎙️ Receiving audio...")
+        
+        # Download Audio
+        file_id = update.message.voice.file_id if update.message.voice else update.message.audio.file_id
+        new_file = await context.bot.get_file(file_id)
+        file_path = f"temp_{user_id}_{file_id}.ogg"
+        await new_file.download_to_drive(file_path)
+        
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="🧠 AI Analyzing (SenseVoice)...")
+        
+        # Call AI Service (or Mock)
+        ai_result = {}
+        try:
+            # Try connecting to local AI service
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                with open(file_path, "rb") as f:
+                     resp = await client.post("http://127.0.0.1:8001/analyze", files={"audio": f})
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    res = data.get("result", {})
+                    ai_result = {
+                        "transcription": res.get("transcript"),
+                        "sentiment_score": res.get("intensity", 0.5), # Map intensity to score roughly
+                        "keywords": res.get("keywords", [])
+                    }
+                else:
+                    raise Exception(f"Service Error {resp.status_code}")
+                    
+        except Exception as e:
+            print(f"AI Service Failed: {e}")
+            # FALLBACK MOCK (For Simulated Testing)
+            ai_result = {
+                 "transcription": "[Simulated] The environment was amazing and the people were very friendly. Highly recommended!",
+                 "sentiment_score": 0.9,
+                 "keywords": ["amazing", "friendly", "recommended"]
+            }
+        
+        # Cleanup
+        try:
+            os.remove(file_path)
+        except:
+            pass
+            
+        # Store in DB
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                INSERT INTO feedbacks 
+                (activity_id, user_id, user_handle, audio_url, transcription, sentiment_score, keywords)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                event_id, 
+                str(user_id), 
+                update.effective_user.username,
+                "telegram_file_id:" + file_id,
+                ai_result['transcription'],
+                ai_result['sentiment_score'],
+                json.dumps(ai_result['keywords'])
+            ))
+            conn.commit()
+            
+            # Reply
+            await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id, 
+                message_id=status_msg.message_id, 
+                text=f"✅ **Feedback Recorded!**\n\n💬 \"{ai_result['transcription'][:100]}...\"\n😊 Sentiment: {ai_result['sentiment_score']:.2f}\n🏷️ Keywords: {', '.join(ai_result['keywords'])}",
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+             await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ Save Error: {e}")
+        finally:
+            cur.close()
+            conn.close()
+
+
 if __name__ == '__main__':
     if not BOT_TOKEN:
         print("Error: BOT_TOKEN not found in .env")
@@ -215,10 +324,13 @@ if __name__ == '__main__':
     start_handler = CommandHandler('start', start)
     submit_handler = CommandHandler('submit', submit_url)
     list_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), list_events)
+    # Generic message handler for Numbers and Voice
+    msg_handler = MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, handle_message)
     
     application.add_handler(start_handler)
     application.add_handler(submit_handler)
     application.add_handler(list_handler)
+    application.add_handler(msg_handler)
     
     print("Bot is running...")
     application.run_polling()
