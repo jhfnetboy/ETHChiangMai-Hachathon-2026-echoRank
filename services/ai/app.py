@@ -346,7 +346,7 @@ async def compare_voiceprints(data: Dict[str, Any]):
         return {
             "success": True,
             "similarity": similarity,
-            "matched": similarity > 0.85 # 阈值建议 0.85
+            "matched": similarity > 0.60 # 阈值从 0.85 降低到 0.60，更符合实际场景
         }
     except Exception as e:
         logger.error(f"Comparison error: {e}")

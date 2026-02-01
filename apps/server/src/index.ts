@@ -46,14 +46,31 @@ app.get("/api/activity", async (req, res) => {
     return;
   }
   try {
-    const r = await fetch(u);
+    const r = await fetch(u, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+      },
+      redirect: 'follow',
+    });
+    
+    if (!r.ok) {
+        console.error(`[Crawler] 抓取失败: ${u} | 状态码: ${r.status}`);
+        res.status(r.status).json({ error: `Remote server returned ${r.status}`, url: u });
+        return;
+    }
+
     const text = await r.text();
     const titleMatch = text.match(/<title>(.*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1] : "";
-    const summary = text.slice(0, 200);
+    const title = titleMatch ? (titleMatch[1] || "").trim() : "";
+    const summary = text.slice(0, 500).replace(/<[^>]*>/g, '').trim();
     res.json({ title, summary });
-  } catch (e) {
-    res.status(500).json({ error: "fetch failed" });
+  } catch (e: any) {
+    console.error(`[Crawler] 抓取链接异常: ${u}`, e.message);
+    res.status(500).json({ error: "fetch failed", details: e.message });
   }
 });
 

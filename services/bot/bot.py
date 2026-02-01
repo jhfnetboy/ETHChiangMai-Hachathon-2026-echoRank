@@ -568,7 +568,8 @@ async def handle_voice_test(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 result = comp_resp.json()
                 similarity = result.get("similarity", 0)
-                matched = result.get("matched", False)
+                # Match Threshold
+                matched = similarity > 0.60
                 
                 emoji = "✅" if matched else "❌"
                 status = "<b>Identity Matched!</b>" if matched else "<b>Identity Mismatch!</b>"
