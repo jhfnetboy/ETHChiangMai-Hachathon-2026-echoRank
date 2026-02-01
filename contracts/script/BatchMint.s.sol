@@ -35,8 +35,10 @@ contract BatchMintNFT is Script {
             );
         }
 
+        bool[] memory flags = new bool[](recipients.length); // Default false
+
         vm.startBroadcast(operatorPrivateKey);
-        CommunityNFT(nftAddress).batchMint(recipients, uris);
+        CommunityNFT(nftAddress).batchMint(recipients, uris, flags);
         vm.stopBroadcast();
 
         console.log("Batch minted to", recipients.length, "addresses");
