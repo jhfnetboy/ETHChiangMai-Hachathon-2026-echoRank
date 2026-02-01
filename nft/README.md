@@ -24,21 +24,7 @@
 为了验证工厂与 SDK 逻辑，我们完成了安妮 (Anni) 社区的完整开通流程：
 - **Anni 社区合约**: [`0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560`](https://sepolia.etherscan.io/address/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560)
 - **Token #0 (可转让)**: [`查看 Mint 记录`](https://sepolia.etherscan.io/tx/0x915c2ec5b086782ff1907b22a613568c04902cd909c063b40e796030999da8c9) —— 由安妮亲自铸造。
-- **Token #1 (SBT)**: [`查看 Mint 记录`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2) —— 由 AI Agent 自动化铸造，永久不可转让。
-
-#### 📸 现场演示截图 (Live Demo)
-我们记录了从 Telegram 交互到自动铸造的全过程：
-
-**1. 智能回复与分析 (AI Response)**
-![AI Response](../docs/images/bot_response.png)
-
-**2. 铸造成功通知 (Mint Success)**
-![Mint Success](../docs/images/telegram_mint.png)
-
-> **如何查看 NFT 图片？**
-> 1. 点击上方的 Mint 记录链接进入 Etherscan。
-> 2. 查看 "Logs" 或 "NFT Transfers" 确认 Token ID。
-> 3. 前往 [OpenSea Testnet](https://testnets.opensea.io/) 并搜索合约地址 `0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560` 即可查看带情绪标签的动态图片。
+- **Token #3 (SBT)**: [`查看 Mint 记录`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2) —— 由 AI Agent 自动化铸造，永久不可转让。
 
 
 ---
@@ -120,15 +106,15 @@ To verify the Factory & SDK logic, we completed Anni's community onboarding:
 
 > **How to view the NFT Image?**
 >
-> **Method A: Web2 View (User Friendly)**
-> 1. Click the Mint Tx link above to Etherscan.
-> 2. Go to [OpenSea Testnet](https://testnets.opensea.io/) and search for contract `0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560`.
-> 3. You will see the SBT with dynamic emotion tags.
+> **Method A: Web2 View (Visual)**
+> Since OpenSea has deprecated testnets, please use these alternatives:
+> 1. [**👀 View on Rarible Testnet**](https://testnet.rarible.com/token/sepolia/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560:3)
+> 2. [**🔎 View on NFTScan**](https://sepolia.nftscan.com/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560/3)
+> *(Both support dynamic SVG/Image rendering)*
 >
-> **Method B: Decentralized View (Source of Truth)**
-> Since this is a decentralized application, the image lives on IPFS, not a centralized server.
+> **Method B: Decentralized View (Source)**
 > - **IPFS CID**: `bafkreihqmsnyn4s5rt6nnyrxbwaufzmrsr2xfbj4yeqgi6qdr35umzxiay`
-> - **View on Gateway**: [ipfs.io/ipfs/baf...xiay](https://ipfs.io/ipfs/bafkreihqmsnyn4s5rt6nnyrxbwaufzmrsr2xfbj4yeqgi6qdr35umzxiay)
+> - **Gateway**: [ipfs.io/ipfs/baf...xiay](https://ipfs.io/ipfs/bafkreihqmsnyn4s5rt6nnyrxbwaufzmrsr2xfbj4yeqgi6qdr35umzxiay)
 
 
 
