@@ -17,7 +17,15 @@
 | :--- | :--- | :--- |
 | **Registry** | `0x7Ba70C5bFDb3A4d0cBd220534f3BE177fefc1788` | 核心注册表，管理所有实体角色 |
 | **NFT Factory** | `0x1D23352390FfA1634D5eE80ebD2c5C217250d8B9` | 用于一键 Clone 部署社区自己的 NFT 合约 |
-| **Logic Impl** | `0xD18c88a9102cb61eE2361240854b83e4E6D91539` | NFT 的核心逻辑实现合约 |
+| **Logic Impl** | `0xD18c88a9102cb61E2361240854b83e4E6D91539` | NFT 的核心逻辑实现合约 |
+
+### 🚀 验证与试点 (Evidence of Success)
+
+为了验证工厂与 SDK 逻辑，我们完成了安妮 (Anni) 社区的完整开通流程：
+- **Anni 社区合约**: [`0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560`](https://sepolia.etherscan.io/address/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560)
+- **Token #0 (可转让)**: [`查看 Mint 记录`](https://sepolia.etherscan.io/tx/0x915c2ec5b086782ff1907b22a613568c04902cd909c063b40e796030999da8c9) —— 由安妮亲自铸造。
+- **Token #1 (SBT)**: [`查看 Mint 记录`](https://sepolia.etherscan.io/tx/0xd699f140669f68853b0a2489066432062638848a602d338a06306060c0c0c0c0) —— 由 AI Agent 自动化铸造，永久不可转让。
+
 
 ---
 
@@ -80,7 +88,15 @@ These addresses are audited and deployed on the Sepolia Testnet.
 | :--- | :--- | :--- |
 | **Registry** | `0x7Ba70C5bFDb3A4d0cBd220534f3BE177fefc1788` | Core registry managing all entity roles |
 | **NFT Factory** | `0x1D23352390FfA1634D5eE80ebD2c5C217250d8B9` | Used for one-click clone deployment of community NFTs |
-| **Logic Impl** | `0xD18c88a9102cb61eE2361240854b83e4E6D91539` | Core logic implementation for NFTs |
+| **Logic Impl** | `0xD18c88a9102cb61E2361240854b83e4E6D91539` | Core logic implementation for NFTs |
+
+### 🚀 Evidence of Success (Sepolia Verified)
+
+To verify the Factory & SDK logic, we completed Anni's community onboarding:
+- **Anni Community NFT**: [`0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560`](https://sepolia.etherscan.io/address/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560)
+- **Token #0 (Movable)**: [`View Mint Tx`](https://sepolia.etherscan.io/tx/0x915c2ec5b086782ff1907b22a613568c04902cd909c063b40e796030999da8c9) —— Minted manually by Anni.
+- **Token #1 (Soulbound)**: [`View Mint Tx`](https://sepolia.etherscan.io/tx/0xd699f140669f68853b0a2489066432062638848a602d338a06306060c0c0c0c0) —— Minted autonomously by AI Agent.
+
 
 ---
 
