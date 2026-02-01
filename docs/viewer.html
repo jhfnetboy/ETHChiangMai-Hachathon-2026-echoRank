@@ -54,16 +54,19 @@
             // Decode Base64 Data URI
             const jsonPart = uri.split('base64,')[1];
             const metadata = JSON.parse(atob(jsonPart));
+            console.log("Metadata loaded:", metadata);
             
-            // Convert IPFS URL to Gateway
-            const imageUrl = metadata.image.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
+            // Image Logic: 1. Try IPFS Gateway, 2. Fallback to Local
+            const ipfsCid = metadata.image.replace("ipfs://", "");
+            const gatewayUrl = `https://ipfs.io/ipfs/${ipfsCid}`;
+            const localUrl = `./images/token_3.png`;
 
             let tagsHtml = metadata.attributes.map(attr => 
                 `<div class="tag"><span>${attr.trait_type}:</span> ${attr.value}</div>`
             ).join('');
 
             card.innerHTML = `
-                <img src="${imageUrl}" alt="NFT Image" />
+                <img id="nft-img" src="${gatewayUrl}" onerror="this.src='${localUrl}'; console.warn('IPFS Gateway failed, using local fallback');" alt="NFT Image" />
                 <h1>${metadata.name}</h1>
                 <p>${metadata.description}</p>
                 <div class="tags">${tagsHtml}</div>
@@ -73,8 +76,8 @@
                 </div>
             `;
         } catch (error) {
-            console.error(error);
-            card.innerHTML = `<p style="color: #ef4444">Error loading NFT: ${error.message}</p>`;
+            console.error("NFT Load Error:", error);
+            card.innerHTML = `<p style="color: #ef4444">Error loading NFT from Blockchain: ${error.message}<br><br>Please check your internet connection or RPC limits.</p>`;
         }
     }
 
