@@ -20,6 +20,14 @@ const ABI = [
     "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
     "stateMutability": "nonpayable",
     "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "account", "type": "address" },
+      { "internalType": "bytes32", "name": "neededRole", "type": "bytes32" }
+    ],
+    "name": "AccessControlUnauthorizedAccount",
+    "type": "error"
   }
 ] as const;
 
@@ -32,9 +40,9 @@ async function main() {
     .help()
     .argv;
   
-  const privateKey = process.env.PRIVATE_KEY;
+  const privateKey = process.env.AI_AGENT_PRIVATE_KEY;
   if (!privateKey) {
-    console.error(JSON.stringify({ success: false, error: "PRIVATE_KEY not found in .env" }));
+    console.error(JSON.stringify({ success: false, error: "AI_AGENT_PRIVATE_KEY not found in .env" }));
     process.exit(1);
   }
 

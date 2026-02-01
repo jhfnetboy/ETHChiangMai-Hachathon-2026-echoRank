@@ -10,9 +10,17 @@ import html
 import re
 import base64
 
-# Load environment variables from local .env
+# Load environment variables
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(env_path)
+
+# ALSO Load Root .env for AI_AGENT_PRIVATE_KEY
+root_env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.env'))
+load_dotenv(root_env_path)
+
+# ALSO Load Root .env for PRIVATE_KEY
+root_env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.env'))
+load_dotenv(root_env_path)
 
 # Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -565,11 +573,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         # 4. Trigger Mint Script
                         status_mint = await context.bot.send_message(chat_id=update.effective_chat.id, text="✨ High Quality Feedback! Minting SBT...")
                         
-                        # Prepare params
-                        mint_script = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts/mint-service/mint.ts'))
+                        # Prepare paths
+                        mint_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts/mint-service'))
+                        mint_script = "mint.ts" # Relative to mint_dir
                         
                         # Construct Metadata
-                        # Retrieve event title first to use in metadata
                         cur.execute("SELECT title FROM activities WHERE id = %s", (event_id,))
                         ev_row = cur.fetchone()
                         ev_title = ev_row[0] if ev_row else "Community Event"
@@ -592,11 +600,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         token_uri = f"data:application/json;base64,{metadata_b64}"
                         
                         try:
-                            # Use pnpm tsx to run
-                            # Ensure we are in the script directory or use full path
-                            # cwd = root of workspace
-                            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-                            
+                            # Use pnpm tsx to run from the service directory
                             cmd = [
                                 "pnpm", "tsx", mint_script,
                                 "--to", wallet_address,
@@ -606,23 +610,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             ]
                             
                             logging.info(f"Running Mint Command: {' '.join(cmd)}")
+                            logging.info(f"CWD: {mint_dir}")
                             
+                            # Prepare ENV with corrected Private Key
+                            subprocess_env = os.environ.copy()
+                            pk = subprocess_env.get("AI_AGENT_PRIVATE_KEY", "")
+                            if pk.isdigit():
+                                try:
+                                    # Convert decimal string to hex string
+                                    # hex(int(pk)) returns '0x...' which is exactly what we need
+                                    hex_pk = hex(int(pk))
+                                    subprocess_env["AI_AGENT_PRIVATE_KEY"] = hex_pk
+                                    logging.info("Converted decimal AI_AGENT_PRIVATE_KEY to hex format for mint script.")
+                                except Exception as e:
+                                    logging.error(f"Failed to convert AI_AGENT_PRIVATE_KEY: {e}")
+
                             # Run async
                             process = await asyncio.create_subprocess_exec(
                                 *cmd,
                                 stdout=asyncio.subprocess.PIPE,
                                 stderr=asyncio.subprocess.PIPE,
-                                cwd=cwd,
-                                env={**os.environ} # Pass env vars including PRIVATE_KEY
+                                cwd=mint_dir,
+                                env=subprocess_env
                             )
                             stdout, stderr = await process.communicate()
                             
+                            stdout_str = stdout.decode().strip()
+                            stderr_str = stderr.decode().strip()
+                            
+                            logging.info(f"Mint STDOUT: {stdout_str}")
+                            if stderr_str:
+                                logging.warning(f"Mint STDERR: {stderr_str}")
+                            
                             if process.returncode == 0:
-                                output = stdout.decode().strip()
                                 # Parse last line or find JSON
                                 try:
                                     # Find the JSON object in the output using regex
-                                    match = re.search(r'(\{.*\})', output)
+                                    match = re.search(r'(\{.*\})', stdout_str)
                                     if match:
                                         res_json = json.loads(match.group(1))
                                         if res_json.get('success'):
@@ -647,14 +671,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         else:
                                             raise Exception(res_json.get('error', 'Unknown Error'))
                                     else:
-                                        raise Exception("Invalid JSON output form mint script: " + output)
+                                        raise Exception("Invalid JSON output form mint script: " + stdout_str)
                                 except Exception as e:
                                      logging.error(f"Mint Output Parse Error: {e}")
                                      await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_mint.message_id, text=f"⚠️ Minting initiated but failed to parse result. Please checks logs.")
                             else:
-                                err_msg = stderr.decode().strip()
-                                logging.error(f"Mint Script Failed: {err_msg}")
-                                await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_mint.message_id, text=f"❌ Minting Failed: {err_msg}")
+                                logging.error(f"Mint Script Failed with code {process.returncode}")
+                                await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_mint.message_id, text=f"❌ Minting Failed (Code {process.returncode}): {stderr_str}")
 
                         except Exception as e:
                             logging.error(f"Mint Execution Error: {e}")
