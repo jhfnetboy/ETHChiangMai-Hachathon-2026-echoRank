@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 import psycopg2
 from urllib.parse import urlparse
 import html
+import re
+import base64
 
 # Load environment variables from local .env
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -64,9 +66,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 <b>Welcome to EchoRank Bot!</b>\n\n"
         "I am your decentralized event assistant and community sentiment analyzer.\n\n"
         "🚀 <b>Quick Start:</b>\n"
-        "1️⃣ <b>Discover</b>: Type 'Event' or '活动' to see upcoming events.\n"
-        "2️⃣ <b>Feedback</b>: Select an event ID and send a <b>Voice Note</b>.\n"
-        "3️⃣ <b>Report</b>: Use <code>/report &lt;id&gt;</code> to see community consensus.\n\n"
+        "1️⃣ <b>Register</b>: <code>/register &lt;0x... or .eth&gt;</code> to link your wallet.\n"
+        "2️⃣ <b>Discover</b>: Type 'Event' or '活动' to see upcoming events.\n"
+        "3️⃣ <b>Feedback</b>: Select an event ID and send a <b>Voice Note</b>.\n"
+        "4️⃣ <b>Report</b>: Use <code>/report &lt;id&gt;</code> to see community consensus.\n\n"
         "📥 <b>Submit an Event:</b>\n"
         "Use <code>/submit &lt;url&gt;</code> (e.g., Luma or Eventbrite link).\n"
         "<i>Note: Events are validated by AI based on:</i>\n"
@@ -99,6 +102,50 @@ from services.ai.validator import validate_event_content
 from services.ai.summarizer import generate_community_report
 
 # ... (Previous imports remain, ensure clean merge)
+
+# ... (Previous imports remain, ensure clean merge)
+
+async def register_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    logging.info(f"👤 Register command called by {user_id}")
+    
+    if not context.args:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="usage: /register <wallet_address>")
+        return
+
+    address = context.args[0]
+    logging.info(f"📝 Attempting to register address: {address}")
+
+    # Address validation: Allow 0x... (40 chars) OR *.eth
+    is_eth_addr = re.match(r"^0x[a-fA-F0-9]{40}$", address)
+    is_ens = address.endswith(".eth")
+    
+    if not (is_eth_addr or is_ens):
+         logging.warning(f"❌ Invalid address format: {address}")
+         await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Invalid Wallet Address. Please use a valid Ethereum address (start with 0x) or an ENS domain (.eth).")
+         return
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO user_wallets (user_id, wallet_address) 
+                VALUES (%s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET wallet_address = EXCLUDED.wallet_address
+            """, (user_id, address))
+            conn.commit()
+        
+        logging.info(f"✅ Wallet registered for {user_id}: {address}")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id, 
+            text=f"✅ <b>Wallet Registered!</b>\nLinked <code>{address}</code> to your Telegram account.\nYou will now receive SBTs for high-quality voice feedback.",
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        logging.error(f"❌ Reg DB Error: {e}")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"❌ Database error: {str(e)}")
+    finally:
+        conn.close()
 
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -502,6 +549,125 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='HTML'
             )
             
+            
+            # --- AUTO MINT SBT LOGIC ---
+            # 1. Check Confidence
+            if ai_result['confidence'] >= 0.6:
+                 # 2. Check if wallet registered
+                 cur.execute("SELECT wallet_address FROM user_wallets WHERE user_id = %s", (str(user_id),))
+                 wallet_row = cur.fetchone()
+                 
+                 if wallet_row:
+                     wallet_address = wallet_row[0]
+                     # 3. Check if we have an NFT contract address (from ENV)
+                     nft_contract = os.getenv("NFT_CONTRACT_ADDRESS")
+                     if nft_contract:
+                        # 4. Trigger Mint Script
+                        status_mint = await context.bot.send_message(chat_id=update.effective_chat.id, text="✨ High Quality Feedback! Minting SBT...")
+                        
+                        # Prepare params
+                        mint_script = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts/mint-service/mint.ts'))
+                        
+                        # Construct Metadata
+                        # Retrieve event title first to use in metadata
+                        cur.execute("SELECT title FROM activities WHERE id = %s", (event_id,))
+                        ev_row = cur.fetchone()
+                        ev_title = ev_row[0] if ev_row else "Community Event"
+                        
+                        ipfs_image = "ipfs://bafkreihqmsnyn4s5rt6nnyrxbwaufzmrsr2xfbj4yeqgi6qdr35umzxiay"
+                        
+                        metadata = {
+                            "name": ev_title,
+                            "description": f"SBT for participating in {ev_title}. Verified by EchoRank AI.",
+                            "image": ipfs_image,
+                            "attributes": [
+                                {"trait_type": "Type", "value": "Voice Feedback Reward"},
+                                {"trait_type": "Confidence", "value": f"{ai_result['confidence']:.2f}"},
+                                {"trait_type": "Sentiment", "value": ai_result['emotion']}
+                            ]
+                        }
+                        
+                        metadata_str = json.dumps(metadata)
+                        metadata_b64 = base64.b64encode(metadata_str.encode('utf-8')).decode('utf-8')
+                        token_uri = f"data:application/json;base64,{metadata_b64}"
+                        
+                        try:
+                            # Use pnpm tsx to run
+                            # Ensure we are in the script directory or use full path
+                            # cwd = root of workspace
+                            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+                            
+                            cmd = [
+                                "pnpm", "tsx", mint_script,
+                                "--to", wallet_address,
+                                "--uri", token_uri,
+                                "--soulbound", "true",
+                                "--contract", nft_contract
+                            ]
+                            
+                            logging.info(f"Running Mint Command: {' '.join(cmd)}")
+                            
+                            # Run async
+                            process = await asyncio.create_subprocess_exec(
+                                *cmd,
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE,
+                                cwd=cwd,
+                                env={**os.environ} # Pass env vars including PRIVATE_KEY
+                            )
+                            stdout, stderr = await process.communicate()
+                            
+                            if process.returncode == 0:
+                                output = stdout.decode().strip()
+                                # Parse last line or find JSON
+                                try:
+                                    # Find the JSON object in the output using regex
+                                    match = re.search(r'(\{.*\})', output)
+                                    if match:
+                                        res_json = json.loads(match.group(1))
+                                        if res_json.get('success'):
+                                            tx_hash = res_json.get('tx')
+                                            etherscan_link = f"https://sepolia.etherscan.io/tx/{tx_hash}"
+                                            
+                                            esc_ev_title = html.escape(ev_title)
+                                            
+                                            success_msg = (
+                                                f"🎉 <b>SBT Dropped!</b>\n\n"
+                                                f"📜 <b>Event:</b> {esc_ev_title}\n"
+                                                f"💎 <b>Type:</b> Soulbound Token (Evidence of Attendance)\n"
+                                                f"👤 <b>To:</b> <code>{wallet_address}</code>\n\n"
+                                                f"🔗 <a href='{etherscan_link}'>View on Etherscan</a>"
+                                            )
+                                            await context.bot.edit_message_text(
+                                                chat_id=update.effective_chat.id, 
+                                                message_id=status_mint.message_id, 
+                                                text=success_msg,
+                                                parse_mode='HTML'
+                                            )
+                                        else:
+                                            raise Exception(res_json.get('error', 'Unknown Error'))
+                                    else:
+                                        raise Exception("Invalid JSON output form mint script: " + output)
+                                except Exception as e:
+                                     logging.error(f"Mint Output Parse Error: {e}")
+                                     await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_mint.message_id, text=f"⚠️ Minting initiated but failed to parse result. Please checks logs.")
+                            else:
+                                err_msg = stderr.decode().strip()
+                                logging.error(f"Mint Script Failed: {err_msg}")
+                                await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_mint.message_id, text=f"❌ Minting Failed: {err_msg}")
+
+                        except Exception as e:
+                            logging.error(f"Mint Execution Error: {e}")
+                            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_mint.message_id, text=f"❌ System Error during minting: {str(e)}")
+                 else:
+                     # User not registered
+                     await context.bot.send_message(
+                         chat_id=update.effective_chat.id, 
+                         text="💡 <b>Tip:</b> Your feedback quality was high! If you link your wallet with <code>/register &lt;address&gt;</code>, you could have earned an SBT.", 
+                         parse_mode='HTML'
+                     )
+
+            
         except Exception as e:
              await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ Save Error: {e}")
         finally:
@@ -617,6 +783,7 @@ if __name__ == '__main__':
     application.add_handler(submit_handler)
     application.add_handler(report_handler)
     application.add_handler(test_voice_handler)
+    application.add_handler(CommandHandler('register', register_wallet))
     application.add_handler(msg_handler)
     
     print("Bot is running...")

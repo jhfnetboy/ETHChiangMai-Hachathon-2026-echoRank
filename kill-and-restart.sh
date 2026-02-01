@@ -76,6 +76,12 @@ echo "Backend started (PID $!). Log: backend.log"
 
 wait_for_service "http://localhost:8000/status" "Node Backend"
 
+# 2.5 Preparing NFT Mint Service
+echo "[2.5/3] Preparing NFT Mint Service..."
+cd "${ROOT_DIR}/scripts/mint-service"
+pnpm install > /dev/null 2>&1 || true
+echo "NFT Mint Service dependencies ready."
+
 # 3. Restart Telegram bot
 echo "[3/3] Starting Telegram bot..."
 cd "${ROOT_DIR}/services/bot"

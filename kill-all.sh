@@ -42,6 +42,9 @@ kill_by_port 8001
 # Telegram bot
 kill_by_pattern "bot.py"
 
+# NFT Mint processes (if any stuck)
+kill_by_pattern "mint.ts"
+
 # Web frontend (optional, usually run separately but good to have option)
 # kill_by_port 5173
 
