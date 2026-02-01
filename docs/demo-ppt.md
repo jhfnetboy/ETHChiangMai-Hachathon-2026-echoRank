@@ -62,7 +62,21 @@
 
 ---
 
-## 💻 6. 主权节点：一键产品化部署
+## ️ 6. 隐私与价值：声纹Hash + AI Agent Auto Mint NFT
+### Privacy & Value: Voiceprint NFT
+
+*   **阅后即焚 (Burn After Reading)**: 原始音频在本地主权节点处理完后**立即物理删除**，绝不留存。
+*   **不可逆哈希 (Irreversible Hash)**: 仅上链 `Hash(声纹 + 活动ID)`。数学上保证无法反推原始声音。
+*   **情绪资产**: 这枚 NFT 证明了你不仅“到场”，而且贡献了真实的“情绪价值”。
+*   **自动铸造 (Auto Mint)**: 
+    *   ![Mint Success](./images/telegram_mint.png)
+    *   ![Metadata Preview](./images/metadata_preview.png)
+    *   [`查看链上记录`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2)
+    *   [`查看NFT`](https://sepolia.etherscan.io/token/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560?a=3)
+
+---
+
+## 💻 7. 主权节点：一键产品化部署
 ### Sovereign Node: One-Click Deployment
 
 ![Sovereign Node](./assets/mac_sovereign_node_1769924522646.png)
@@ -70,18 +84,6 @@
 *   **Mac 友好**: 充分利用 Apple Silicon 强劲算力。
 *   **Docker 驱动**: `setup-production.sh` 极速搭建。
 *   **数据主权**: 数据库、AI 模型全本地运行。
-
----
-
-## 🛡️ 7. 隐私与价值：声纹Hash + AI Agent Auto Mint NFT
-### Privacy & Value: Voiceprint NFT
-
-*   **阅后即焚 (Burn After Reading)**: 原始音频在本地主权节点处理完后**立即物理删除**，绝不留存。
-*   **不可逆哈希 (Irreversible Hash)**: 仅上链 `Hash(声纹 + 活动ID)`。数学上保证无法反推原始声音。
-*   **情绪资产**: 这枚 NFT 证明了你不仅“到场”，而且贡献了真实的“情绪价值”。
-*   **自动铸造**: 
-    *   ![Mint Success](./images/telegram_mint.png)
-    *   [`查看链上记录`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2)
 
 ---
 
@@ -145,17 +147,21 @@
 
 ---
 
-## 💻 6. Sovereign Node: Production Ready
-![Sovereign Node](./assets/mac_sovereign_node_1769924522646.png)
-*   **One-Click**: Deploy via `setup-production.sh`.
-*   **Portable**: Fully containerized with Docker.
-
----
-
-## 🛡️ 7. Privacy & Value: Voiceprint NFT
+## ️ 6. Privacy & Value: Voiceprint NFT
 *   **Burn After Reading**: Raw audio is **deleted locally** immediately after processing. Never uploaded.
 *   **Irreversible Hash**: Only `Hash(Voiceprint + EventID)` is stored. Your voice data is safe.
 *   **Emotional Asset**: The NFT proves your authentic emotional contribution to the event.
+*   **Auto-Mint**:
+    *   ![Mint Success](./images/telegram_mint.png)
+    *   ![Metadata Preview](./images/metadata_preview.png)
+    *   [`View On-Chain`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2)
+
+---
+
+## 💻 7. Sovereign Node: Production Ready
+![Sovereign Node](./assets/mac_sovereign_node_1769924522646.png)
+*   **One-Click**: Deploy via `setup-production.sh`.
+*   **Portable**: Fully containerized with Docker.
 
 ---
 
