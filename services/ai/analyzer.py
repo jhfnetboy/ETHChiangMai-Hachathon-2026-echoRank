@@ -5,14 +5,78 @@
 
 import io
 import re
-import numpy as np
+import os
+import io
 import torch
 import torchaudio
+import numpy as np
+from typing import Dict, Tuple, List, Any
 from funasr import AutoModel
-from typing import Dict, Tuple, List
 import logging
+import torch.nn.functional as F
+try:
+    import jieba
+    import jieba.analyse
+except ImportError:
+    jieba = None
 
 logger = logging.getLogger(__name__)
+
+
+class SpeakerVerifier:
+    """声纹识别器"""
+    
+    def __init__(self, model_path="damo/speech_campplus_sv_zh-cn_16k-common"):
+        """初始化声纹模型"""
+        logger.info(f"Loading Speaker Verification model from: {model_path}")
+        self.model = AutoModel(
+            model=model_path,
+            trust_remote_code=True,
+            disable_update=True
+        )
+        logger.info("Speaker Verification model loaded successfully")
+
+    def get_embedding(self, audio_bytes: bytes) -> np.ndarray:
+        """从音频中提取声纹特征向量"""
+        # 预处理音频 (借用 EmotionAnalyzer 的逻辑)
+        analyzer_temp = EmotionAnalyzer(load_model=False)
+        audio_array, _ = analyzer_temp._preprocess_audio(audio_bytes)
+        
+        # 运行推理
+        result = self.model.generate(input=audio_array)
+        
+        # 返回 Embedding (通常是一个 1D-vector)
+        # 结果结构取决于具体模型，campp 通常在 'spk_embedding' 字段
+        if isinstance(result, list) and len(result) > 0:
+            return result[0]["spk_embedding"]
+        return None
+
+    @staticmethod
+    def calculate_similarity(emb1: Any, emb2: Any) -> float:
+        """计算两个声纹向量的余弦相似度"""
+        if emb1 is None or emb2 is None:
+            return 0.0
+            
+        # Ensure inputs are numpy arrays
+        if isinstance(emb1, list):
+            emb1 = np.array(emb1)
+        if isinstance(emb2, list):
+            emb2 = np.array(emb2)
+            
+        if not isinstance(emb1, np.ndarray) or not isinstance(emb2, np.ndarray):
+            print(f"DEBUG: Invalid types for similarity: {type(emb1)} {type(emb2)}")
+            return 0.0
+
+        # Flatten to ensure (D,) shape instead of (1, D)
+        emb1 = emb1.flatten()
+        emb2 = emb2.flatten()
+
+        t1 = torch.from_numpy(emb1).float()
+        t2 = torch.from_numpy(emb2).float()
+        
+        # Cosine Similarity
+        similarity = F.cosine_similarity(t1.unsqueeze(0), t2.unsqueeze(0))
+        return float(similarity.item())
 
 
 class EmotionAnalyzer:
@@ -40,8 +104,11 @@ class EmotionAnalyzer:
         "<|Cough|>": "cough",
     }
     
-    def __init__(self, model_path="iic/SenseVoiceSmall"):
+    def __init__(self, model_path="iic/SenseVoiceSmall", load_model=True):
         """初始化 SenseVoice 模型"""
+        if not load_model:
+            return
+            
         logger.info(f"Loading SenseVoice model from: {model_path}")
         print(f"DEBUG: Starting SenseVoice model load from {model_path}...")
         
@@ -167,8 +234,14 @@ class EmotionAnalyzer:
         count = emotion_counts[dominant_emotion]
         
         # 计算强度（出现次数越多，强度越高）
-        intensity = min(0.7 + (count - 1) * 0.1, 0.99)
+        # 让起始分值更加动态，而不是固定的 0.7
+        base_intensity = 0.65
+        intensity = min(base_intensity + (count - 1) * 0.15, 0.98)
         
+        # 针对 NEUTRAL 特殊处理，降低其置信度，鼓励系统识别更强烈的情绪
+        if dominant_emotion == "NEUTRAL":
+            intensity = min(intensity, 0.6)
+            
         return dominant_emotion, intensity
     
     def _extract_events(self, text: str) -> List[str]:
@@ -207,17 +280,27 @@ class EmotionAnalyzer:
         
         return cleaned.strip()
     
-    def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
-        """简单的关键词提取（按词频）"""
+    def _extract_keywords(self, text: str, max_keywords: int = 4) -> List[str]:
+        """使用 jieba 进行关键词提取，如果不可用则退回到词频"""
         if not text:
             return []
+            
+        if jieba:
+            try:
+                # 使用 TF-IDF 算法提取关键词
+                keywords = jieba.analyse.extract_tags(text, topK=max_keywords)
+                if keywords:
+                    return keywords
+            except Exception as e:
+                logger.warning(f"Jieba extraction failed: {e}")
+
+        # --- Fallback to simple logic (with better Chinese support) ---
+        # 这种简单的正则在中文下通常会把整句当作一个词
+        words = re.findall(r'[\u4e00-\u9fa5]{2,}|[a-zA-Z]{3,}', text)
         
-        # 分词（简单按空格和标点分割）
-        words = re.findall(r'\w+', text)
-        
-        # 过滤停用词和短词
-        stop_words = {'的', '了', '是', '我', '你', '他', '她', '它', '我们', '你们', '他们'}
-        words = [w for w in words if len(w) > 1 and w not in stop_words]
+        # 过滤停用词
+        stop_words = {'的', '了', '是', '我', '你', '他', '她', '它', '我们', '你们', '他们', '这个', '那个', '一个'}
+        words = [w for w in words if w not in stop_words]
         
         # 统计词频
         word_freq = {}
@@ -226,9 +309,7 @@ class EmotionAnalyzer:
         
         # 按频率排序，取前 N 个
         sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
-        keywords = [word for word, freq in sorted_words[:max_keywords]]
-        
-        return keywords
+        return [word for word, freq in sorted_words[:max_keywords]]
 
 
 # 测试代码
