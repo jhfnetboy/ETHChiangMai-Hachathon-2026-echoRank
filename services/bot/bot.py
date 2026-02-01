@@ -345,6 +345,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
         
         if row:
+            # Clear Test Mode to prevent conflicts
+            if 'test_mode' in context.user_data:
+                del context.user_data['test_mode']
+                
             context.user_data['selected_event'] = event_id
             esc_title = html.escape(row[0])
             await context.bot.send_message(
@@ -368,7 +372,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. Handle Voice Message
     if update.message.voice or update.message.audio:
         # Check if in Identity Test Mode
-        if context.user_data.get('test_mode'):
+        test_mode = context.user_data.get('test_mode')
+        print(f"DEBUG: Voice received. User: {user_id}, test_mode: {test_mode}")
+        
+        if test_mode:
             return await handle_voice_test(update, context)
             
         event_id = context.user_data.get('selected_event')
@@ -471,6 +478,7 @@ async def test_voice_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         del voice_test_state[user_id]
     
     context.user_data['test_mode'] = True
+    print(f"DEBUG: Set test_mode=True for user {user_id}")
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=(

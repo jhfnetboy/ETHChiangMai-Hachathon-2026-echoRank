@@ -14,6 +14,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
+import numpy as np
 
 # 导入自定义模块(优雅降级)
 try:
@@ -71,7 +72,7 @@ async def status():
 @app.on_event("startup")
 async def startup_event():
     """服务启动时初始化组件"""
-    global emotion_analyzer, bls_signer, bot_public_key
+    global emotion_analyzer, speaker_verifier, bls_signer, bot_public_key
     
     logger.info("="*60)
     logger.info("Starting EchoRank AI Backend Service...")
@@ -339,7 +340,8 @@ async def compare_voiceprints(data: Dict[str, Any]):
         if not emb1 or not emb2:
             raise HTTPException(status_code=400, detail="Missing embeddings (embedding1 and embedding2)")
             
-        similarity = speaker_verifier.calculate_similarity(np.array(emb1), np.array(emb2))
+        # analyzer.py handles list -> array conversion
+        similarity = speaker_verifier.calculate_similarity(emb1, emb2)
         
         return {
             "success": True,

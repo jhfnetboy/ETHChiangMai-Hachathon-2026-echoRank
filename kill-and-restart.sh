@@ -44,11 +44,37 @@ else
 fi
 echo "AI Service started (PID $!). Log: services/ai/ai_service.log"
 
+# Function to wait for a service to be ready
+wait_for_service() {
+    local url="$1"
+    local name="$2"
+    local max_retries=45
+    local count=0
+    
+    echo -n "Waiting for $name to be ready..."
+    until curl -s "$url" > /dev/null; do
+        sleep 2
+        count=$((count+1))
+        echo -n "."
+        if [ $count -ge $max_retries ]; then
+            echo " Timeout!"
+            echo "❌ $name failed to start within $((max_retries*2)) seconds."
+            return 1
+        fi
+    done
+    echo " ✅ Ready!"
+}
+
+# Wait for AI completely (Model loading takes time)
+wait_for_service "http://localhost:8001/status" "AI Service (Loading Models...)"
+
 # 2. Restart Node backend
 echo "[2/3] Starting Node backend..."
 cd "${ROOT_DIR}"
 nohup pnpm -C apps/server dev > backend.log 2>&1 &
 echo "Backend started (PID $!). Log: backend.log"
+
+wait_for_service "http://localhost:8000/status" "Node Backend"
 
 # 3. Restart Telegram bot
 echo "[3/3] Starting Telegram bot..."
@@ -63,8 +89,16 @@ fi
 nohup .venv/bin/python bot.py > bot_service.log 2>&1 &
 echo "Bot Service started (PID $!). Log: services/bot/bot_service.log"
 
+# Check if Bot is still alive after a few seconds
+sleep 3
+if ps -p $! > /dev/null; then
+    echo "Bot Process is running."
+else
+    echo "❌ Bot Process died immediately. Check logs."
+fi
+
 echo ""
-echo "✅ All services restarted!"
+echo "✅ All services restarted & verified!"
 echo "AI API: http://localhost:8001"
 echo "Backend: http://localhost:8000"
 echo "Web: http://localhost:5173 (run 'pnpm dev:web' separately)"

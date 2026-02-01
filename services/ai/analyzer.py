@@ -5,11 +5,13 @@
 
 import io
 import re
-import numpy as np
+import os
+import io
 import torch
 import torchaudio
+import numpy as np
 from funasr import AutoModel
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Any
 import logging
 import torch.nn.functional as F
 
@@ -19,12 +21,13 @@ logger = logging.getLogger(__name__)
 class SpeakerVerifier:
     """声纹识别器"""
     
-    def __init__(self, model_path="iic/speech_campp_sv-zh-cn-16k-common-pytorch"):
+    def __init__(self, model_path="damo/speech_campplus_sv_zh-cn_16k-common"):
         """初始化声纹模型"""
         logger.info(f"Loading Speaker Verification model from: {model_path}")
         self.model = AutoModel(
             model=model_path,
-            trust_remote_code=True
+            trust_remote_code=True,
+            disable_update=True
         )
         logger.info("Speaker Verification model loaded successfully")
 
@@ -44,11 +47,25 @@ class SpeakerVerifier:
         return None
 
     @staticmethod
-    def calculate_similarity(emb1: np.ndarray, emb2: np.ndarray) -> float:
+    def calculate_similarity(emb1: Any, emb2: Any) -> float:
         """计算两个声纹向量的余弦相似度"""
         if emb1 is None or emb2 is None:
             return 0.0
             
+        # Ensure inputs are numpy arrays
+        if isinstance(emb1, list):
+            emb1 = np.array(emb1)
+        if isinstance(emb2, list):
+            emb2 = np.array(emb2)
+            
+        if not isinstance(emb1, np.ndarray) or not isinstance(emb2, np.ndarray):
+            print(f"DEBUG: Invalid types for similarity: {type(emb1)} {type(emb2)}")
+            return 0.0
+
+        # Flatten to ensure (D,) shape instead of (1, D)
+        emb1 = emb1.flatten()
+        emb2 = emb2.flatten()
+
         t1 = torch.from_numpy(emb1).float()
         t2 = torch.from_numpy(emb2).float()
         
