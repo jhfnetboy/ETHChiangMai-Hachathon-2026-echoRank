@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EchoRank SBT Viewer</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: #1e293b; border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 400px; width: 100%; text-align: center; border: 1px solid #334155; }
+        img { width: 100%; border-radius: 12px; margin-bottom: 20px; border: 1px solid #475569; }
+        h1 { font-size: 20px; margin: 0 0 8px 0; color: #38bdf8; }
+        p { font-size: 14px; color: #94a3b8; margin: 0 0 24px 0; line-height: 1.5; }
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .tag { background: #334155; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; color: #e2e8f0; border: 1px solid #475569; }
+        .tag span { color: #94a3b8; font-weight: 400; margin-right: 4px; }
+        .footer { margin-top: 24px; font-size: 12px; color: #64748b; }
+        .loading { font-size: 16px; color: #94a3b8; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+<div class="card" id="card">
+    <div class="loading">📡 Fetching data from Sepolia...</div>
+</div>
+
+<script type="module">
+    import { createPublicClient, http, parseAbi } from 'https://esm.sh/viem';
+    import { sepolia } from 'https://esm.sh/viem/chains';
+
+    const CONTRACT_ADDRESS = "0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560";
+    const TOKEN_ID = 3n; // Token ID we minted
+    const RPC_URL = "https://eth-sepolia.g.alchemy.com/v2/Bx4QRW1-vnwJUePSAAD7N";
+
+    const abi = parseAbi([
+        "function tokenURI(uint256 tokenId) view returns (string)"
+    ]);
+
+    const client = createPublicClient({
+        chain: sepolia,
+        transport: http(RPC_URL)
+    });
+
+    async function loadNFT() {
+        const card = document.getElementById('card');
+        try {
+            const uri = await client.readContract({
+                address: CONTRACT_ADDRESS,
+                abi: abi,
+                functionName: 'tokenURI',
+                args: [TOKEN_ID]
+            });
+
+            // Decode Base64 Data URI
+            const jsonPart = uri.split('base64,')[1];
+            const metadata = JSON.parse(atob(jsonPart));
+            console.log("Metadata loaded:", metadata);
+            
+            // Image Logic: 1. Try IPFS Gateway, 2. Fallback to Local
+            const ipfsCid = metadata.image.replace("ipfs://", "");
+            const gatewayUrl = `https://ipfs.io/ipfs/${ipfsCid}`;
+            const localUrl = `./images/token_3.png`;
+
+            let tagsHtml = metadata.attributes.map(attr => 
+                `<div class="tag"><span>${attr.trait_type}:</span> ${attr.value}</div>`
+            ).join('');
+
+            card.innerHTML = `
+                <img id="nft-img" src="${gatewayUrl}" onerror="this.src='${localUrl}'; console.warn('IPFS Gateway failed, using local fallback');" alt="NFT Image" />
+                <h1>${metadata.name}</h1>
+                <p>${metadata.description}</p>
+                <div class="tags">${tagsHtml}</div>
+                <div class="footer">
+                    Token ID: #${TOKEN_ID}<br>
+                    Contract: ${CONTRACT_ADDRESS.substring(0,6)}...${CONTRACT_ADDRESS.substring(38)}
+                </div>
+            `;
+        } catch (error) {
+            console.error("NFT Load Error:", error);
+            card.innerHTML = `<p style="color: #ef4444">Error loading NFT from Blockchain: ${error.message}<br><br>Please check your internet connection or RPC limits.</p>`;
+        }
+    }
+
+    loadNFT();
+</script>
+
+</body>
+</html>
