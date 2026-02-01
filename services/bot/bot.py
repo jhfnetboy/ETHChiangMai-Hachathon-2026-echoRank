@@ -31,15 +31,33 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+EMOTION_MAP = {
+    "HAPPY": "开心 😊",
+    "SAD": "悲伤 😟",
+    "ANGRY": "愤怒 😡",
+    "NEUTRAL": "平静 😐",
+    "FEARFUL": "恐惧 😨",
+    "DISGUSTED": "厌恶 🤢",
+    "SURPRISED": "惊讶 😲"
+}
+
 # DB Connection
 def get_db_connection():
-    return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASS,
-        dbname=DB_NAME
-    )
+    try:
+        logging.info(f"🔍 Attempting to connect to database: {DB_NAME} on {DB_HOST}:{DB_PORT} as {DB_USER}")
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASS,
+            dbname=DB_NAME,
+            connect_timeout=5
+        )
+        logging.info("✅ Database connection successful")
+        return conn
+    except Exception as e:
+        logging.error(f"❌ Database connection failed: {e}")
+        raise e
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
@@ -283,43 +301,49 @@ async def submit_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.lower()
-    if not (text == "event" or text == "活动" or text == "/list"):
-        return
-
-    conn = get_db_connection()
-    cur = conn.cursor()
+    msg_text = update.message.text.strip().lower() if update.message.text else ""
+    logging.info(f"📋 list_events called with text: '{msg_text}'")
+    
     try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        logging.info("📡 Fetching validated events from database...")
+        
         # Fetch validated events
         cur.execute("""
-            SELECT id, title, location, ai_summary 
+            SELECT id, title, location, ai_summary, url 
             FROM activities 
             WHERE validation_status = TRUE 
             ORDER BY id DESC LIMIT 10
         """)
         rows = cur.fetchall()
+        logging.info(f"📊 Found {len(rows)} validated events")
         
         if not rows:
+            logging.warning("📭 No validated events found in database.")
             await context.bot.send_message(chat_id=update.effective_chat.id, text="📭 No upcoming events found.")
             return
 
         msg = "📅 <b>Upcoming Events</b>\n\n"
         for row in rows:
-            # row: id, title, location, summary
+            # row: id, title, location, summary, url
             esc_title = html.escape(row[1])
             esc_loc = html.escape(row[2])
             esc_summary = html.escape(row[3])
-            msg += f"<b>{row[0]}. {esc_title}</b>\n📍 {esc_loc}\n<i>{esc_summary}</i>\n\n"
+            esc_url = html.escape(row[4])
+            msg += f"<b>{row[0]}. {esc_title}</b>\n📍 {esc_loc}\n🔗 <a href='{esc_url}'>Source Link</a>\n<i>{esc_summary}</i>\n\n"
             
         msg += "👇 <b>Reply with the Event ID number to give feedback.</b>"
         
+        logging.info(f"📤 Sending event list to user {update.effective_user.id}")
         await context.bot.send_message(chat_id=update.effective_chat.id, text=msg, parse_mode='HTML')
         
     except Exception as e:
+        logging.error(f"❌ Error in list_events: {str(e)}", exc_info=True)
         await context.bot.send_message(chat_id=update.effective_chat.id, text=f"❌ Error fetching events: {str(e)}")
     finally:
-        cur.close()
-        conn.close()
+        if 'cur' in locals(): cur.close()
+        if 'conn' in locals(): conn.close()
 
 
 
@@ -330,8 +354,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 1. Handle Keywords (Event / 活动)
     if update.message.text:
         text = update.message.text.lower().strip()
-        if text in ["event", "活动", "/list"]:
+        logging.info(f"📩 Received message from {user_id}: '{text}'")
+        if text in ["event", "活动", "/list"] or text.startswith("event") or text.startswith("活动"):
+            logging.info(f"🎯 Command match! Calling list_events for user {user_id}")
             return await list_events(update, context)
+        else:
+            logging.debug(f"ℹ️ Message '{text}' did not match event commands")
 
     # 2. Handle Event Selection (Text Number)
     if update.message.text and update.message.text.strip().isdigit():
@@ -407,6 +435,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ai_result = {
                         "transcription": res.get("transcript"),
                         "sentiment_score": res.get("intensity", 0.5), # Map intensity to score roughly
+                        "emotion": res.get("emotion", "NEUTRAL"),
+                        "confidence": res.get("confidence", 0.5),
                         "keywords": res.get("keywords", [])
                     }
                 else:
@@ -418,6 +448,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ai_result = {
                  "transcription": "[Simulated] The environment was amazing and the people were very friendly. Highly recommended!",
                  "sentiment_score": 0.9,
+                 "emotion": "HAPPY",
+                 "confidence": 0.85,
                  "keywords": ["amazing", "friendly", "recommended"]
             }
         
@@ -433,8 +465,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             cur.execute("""
                 INSERT INTO feedbacks 
-                (activity_id, user_id, user_handle, audio_url, transcription, sentiment_score, keywords)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (activity_id, user_id, user_handle, audio_url, transcription, sentiment_score, keywords, emotion, confidence)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 event_id, 
                 str(user_id), 
@@ -442,19 +474,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "telegram_file_id:" + file_id,
                 ai_result['transcription'],
                 ai_result['sentiment_score'],
-                json.dumps(ai_result['keywords'])
+                json.dumps(ai_result['keywords']),
+                ai_result['emotion'],
+                ai_result['confidence']
             ))
             conn.commit()
             
-            # Reply
-            esc_transcript = html.escape(ai_result['transcription'][:150])
+            # Reply with 4 Dimensions
+            esc_transcript = html.escape(ai_result['transcription'])
             esc_keywords = html.escape(", ".join(ai_result['keywords']))
+            emotion_zh = EMOTION_MAP.get(ai_result['emotion'], ai_result['emotion'])
+            confidence_pct = ai_result['confidence'] * 100
             
             reply_text = (
-                f"✅ <b>Feedback Recorded!</b>\n\n"
-                f"💬 \"{esc_transcript}...\"\n"
-                f"😊 Sentiment: {ai_result['sentiment_score']:.2f}\n"
-                f"🏷️ Keywords: {esc_keywords}"
+                f"✅ <b>反馈已记录 (Feedback Recorded)</b>\n\n"
+                f"📝 <b>1. 用户评价 (Evaluation):</b>\n\"{esc_transcript}\"\n\n"
+                f"🎭 <b>2. 语音情感 (Emotion):</b> {emotion_zh}\n\n"
+                f"⚖️ <b>3. 置信度/真实性 (Confidence):</b> {confidence_pct:.1f}%\n"
+                f"😊 <b>综合评分 (Score):</b> {ai_result['sentiment_score']:.2f}\n\n"
+                f"🏷️ <b>4. 关键词 (Keywords):</b> {esc_keywords}"
             )
             
             await context.bot.edit_message_text(

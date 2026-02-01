@@ -1,4 +1,4 @@
-# EchoRank V2: 听见社区的心跳 🎤
+# EchoRank@communityEchoRankBot: 听见社区的心跳 🎤
 ### Emotion-Aware Decentralized Message Board
 
 [跳转到英文版本 (Jump to English) ↓](#english-version)

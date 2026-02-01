@@ -10,10 +10,15 @@ import io
 import torch
 import torchaudio
 import numpy as np
-from funasr import AutoModel
 from typing import Dict, Tuple, List, Any
+from funasr import AutoModel
 import logging
 import torch.nn.functional as F
+try:
+    import jieba
+    import jieba.analyse
+except ImportError:
+    jieba = None
 
 logger = logging.getLogger(__name__)
 
@@ -229,8 +234,14 @@ class EmotionAnalyzer:
         count = emotion_counts[dominant_emotion]
         
         # 计算强度（出现次数越多，强度越高）
-        intensity = min(0.7 + (count - 1) * 0.1, 0.99)
+        # 让起始分值更加动态，而不是固定的 0.7
+        base_intensity = 0.65
+        intensity = min(base_intensity + (count - 1) * 0.15, 0.98)
         
+        # 针对 NEUTRAL 特殊处理，降低其置信度，鼓励系统识别更强烈的情绪
+        if dominant_emotion == "NEUTRAL":
+            intensity = min(intensity, 0.6)
+            
         return dominant_emotion, intensity
     
     def _extract_events(self, text: str) -> List[str]:
@@ -269,17 +280,27 @@ class EmotionAnalyzer:
         
         return cleaned.strip()
     
-    def _extract_keywords(self, text: str, max_keywords: int = 5) -> List[str]:
-        """简单的关键词提取（按词频）"""
+    def _extract_keywords(self, text: str, max_keywords: int = 4) -> List[str]:
+        """使用 jieba 进行关键词提取，如果不可用则退回到词频"""
         if not text:
             return []
+            
+        if jieba:
+            try:
+                # 使用 TF-IDF 算法提取关键词
+                keywords = jieba.analyse.extract_tags(text, topK=max_keywords)
+                if keywords:
+                    return keywords
+            except Exception as e:
+                logger.warning(f"Jieba extraction failed: {e}")
+
+        # --- Fallback to simple logic (with better Chinese support) ---
+        # 这种简单的正则在中文下通常会把整句当作一个词
+        words = re.findall(r'[\u4e00-\u9fa5]{2,}|[a-zA-Z]{3,}', text)
         
-        # 分词（简单按空格和标点分割）
-        words = re.findall(r'\w+', text)
-        
-        # 过滤停用词和短词
-        stop_words = {'的', '了', '是', '我', '你', '他', '她', '它', '我们', '你们', '他们'}
-        words = [w for w in words if len(w) > 1 and w not in stop_words]
+        # 过滤停用词
+        stop_words = {'的', '了', '是', '我', '你', '他', '她', '它', '我们', '你们', '他们', '这个', '那个', '一个'}
+        words = [w for w in words if w not in stop_words]
         
         # 统计词频
         word_freq = {}
@@ -288,9 +309,7 @@ class EmotionAnalyzer:
         
         # 按频率排序，取前 N 个
         sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
-        keywords = [word for word, freq in sorted_words[:max_keywords]]
-        
-        return keywords
+        return [word for word, freq in sorted_words[:max_keywords]]
 
 
 # 测试代码

@@ -36,11 +36,11 @@ kill_by_pattern "apps/server"
 kill_by_port 8000
 
 # Python AI service
-kill_by_pattern "services/ai/app.py"
+kill_by_pattern "app.py"
 kill_by_port 8001
 
 # Telegram bot
-kill_by_pattern "services/bot/bot.py"
+kill_by_pattern "bot.py"
 
 # Web frontend (optional, usually run separately but good to have option)
 # kill_by_port 5173
