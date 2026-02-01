@@ -17,11 +17,11 @@ from typing import Dict, Any, Optional
 
 # 导入自定义模块(优雅降级)
 try:
-    from analyzer import EmotionAnalyzer
+    from analyzer import EmotionAnalyzer, SpeakerVerifier
     ANALYZER_AVAILABLE = True
 except Exception as e:
     ANALYZER_AVAILABLE = False
-    print(f"⚠️  Warning: EmotionAnalyzer not available: {e}")
+    print(f"⚠️  Warning: AI components not available: {e}")
 
 try:
     from bls_signer import BLSSigner, construct_message
@@ -58,6 +58,7 @@ app.add_middleware(
 
 # 全局变量:存储初始化的组件
 emotion_analyzer = None
+speaker_verifier = None
 bls_signer = None
 bot_public_key = None
 
@@ -76,14 +77,19 @@ async def startup_event():
     logger.info("Starting EchoRank AI Backend Service...")
     logger.info("="*60)
     
-    # 1. 初始化情感分析器
+    # 1. 初始化情感分析器与声纹识别器
     if ANALYZER_AVAILABLE:
         try:
             logger.info("Loading SenseVoice emotion analyzer...")
             emotion_analyzer = EmotionAnalyzer()
             logger.info("✅ Emotion analyzer loaded successfully")
+            
+            logger.info("Loading Speaker Verification model (CAM++)...")
+            speaker_verifier = SpeakerVerifier()
+            logger.info("✅ Speaker verifier loaded successfully")
+            
         except Exception as e:
-            logger.error(f"❌ Failed to load emotion analyzer: {e}")
+            logger.error(f"❌ Failed to load AI models: {e}")
             logger.warning("⚠️  Service will run in LIMITED mode (no AI analysis)")
     else:
         logger.warning("⚠️  Analyzer module not available - running in LIMITED mode")
@@ -287,6 +293,61 @@ async def analyze_audio(audio: UploadFile = File(...)):
         logger.error(f"Unexpected error: {e}")
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/voiceprint")
+async def extract_voiceprint(audio: UploadFile = File(...)):
+    """
+    提取音频的声纹特征向量 (Speaker Embedding)
+    """
+    try:
+        if not speaker_verifier:
+            raise HTTPException(status_code=503, detail="Speaker verifier not available")
+            
+        audio_bytes = await audio.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Empty audio file")
+            
+        embedding = speaker_verifier.get_embedding(audio_bytes)
+        
+        if embedding is None:
+            raise HTTPException(status_code=500, detail="Voiceprint extraction failed")
+            
+        return {
+            "success": True,
+            "embedding": embedding.tolist(),
+            "dimensions": len(embedding)
+        }
+    except Exception as e:
+        logger.error(f"Voiceprint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/compare_voiceprints")
+async def compare_voiceprints(data: Dict[str, Any]):
+    """
+    比较两个声纹特征向量的相似度
+    """
+    try:
+        if not speaker_verifier:
+            raise HTTPException(status_code=503, detail="Speaker verifier not available")
+            
+        emb1 = data.get("embedding1")
+        emb2 = data.get("embedding2")
+        
+        if not emb1 or not emb2:
+            raise HTTPException(status_code=400, detail="Missing embeddings (embedding1 and embedding2)")
+            
+        similarity = speaker_verifier.calculate_similarity(np.array(emb1), np.array(emb2))
+        
+        return {
+            "success": True,
+            "similarity": similarity,
+            "matched": similarity > 0.85 # 阈值建议 0.85
+        }
+    except Exception as e:
+        logger.error(f"Comparison error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

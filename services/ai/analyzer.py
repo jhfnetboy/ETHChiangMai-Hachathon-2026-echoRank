@@ -11,8 +11,50 @@ import torchaudio
 from funasr import AutoModel
 from typing import Dict, Tuple, List
 import logging
+import torch.nn.functional as F
 
 logger = logging.getLogger(__name__)
+
+
+class SpeakerVerifier:
+    """声纹识别器"""
+    
+    def __init__(self, model_path="iic/speech_campp_sv-zh-cn-16k-common-pytorch"):
+        """初始化声纹模型"""
+        logger.info(f"Loading Speaker Verification model from: {model_path}")
+        self.model = AutoModel(
+            model=model_path,
+            trust_remote_code=True
+        )
+        logger.info("Speaker Verification model loaded successfully")
+
+    def get_embedding(self, audio_bytes: bytes) -> np.ndarray:
+        """从音频中提取声纹特征向量"""
+        # 预处理音频 (借用 EmotionAnalyzer 的逻辑)
+        analyzer_temp = EmotionAnalyzer(load_model=False)
+        audio_array, _ = analyzer_temp._preprocess_audio(audio_bytes)
+        
+        # 运行推理
+        result = self.model.generate(input=audio_array)
+        
+        # 返回 Embedding (通常是一个 1D-vector)
+        # 结果结构取决于具体模型，campp 通常在 'spk_embedding' 字段
+        if isinstance(result, list) and len(result) > 0:
+            return result[0]["spk_embedding"]
+        return None
+
+    @staticmethod
+    def calculate_similarity(emb1: np.ndarray, emb2: np.ndarray) -> float:
+        """计算两个声纹向量的余弦相似度"""
+        if emb1 is None or emb2 is None:
+            return 0.0
+            
+        t1 = torch.from_numpy(emb1).float()
+        t2 = torch.from_numpy(emb2).float()
+        
+        # Cosine Similarity
+        similarity = F.cosine_similarity(t1.unsqueeze(0), t2.unsqueeze(0))
+        return float(similarity.item())
 
 
 class EmotionAnalyzer:
@@ -40,8 +82,11 @@ class EmotionAnalyzer:
         "<|Cough|>": "cough",
     }
     
-    def __init__(self, model_path="iic/SenseVoiceSmall"):
+    def __init__(self, model_path="iic/SenseVoiceSmall", load_model=True):
         """初始化 SenseVoice 模型"""
+        if not load_model:
+            return
+            
         logger.info(f"Loading SenseVoice model from: {model_path}")
         print(f"DEBUG: Starting SenseVoice model load from {model_path}...")
         

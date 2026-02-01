@@ -21,6 +21,10 @@ DB_USER = os.getenv("POSTGRES_USER", "postgres") # Default for brew
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "")
 DB_NAME = os.getenv("POSTGRES_DB", "echorank_crawler")
 
+# Voiceprint Test State (In-memory for demo)
+# user_id -> first_embedding
+voice_test_state = {}
+
 # Logging Setup
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -51,6 +55,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• 📍 <b>Local</b>: Takes place in Chiang Mai.\n"
         "• 🌐 <b>Web3</b>: Related to Crypto, DAOs, or Decentralization.\n"
         "• 🤝 <b>Co-creation</b>: Encourages participation and building.\n\n"
+        "🎙️ <b>Identity Test:</b>\n"
+        "Use <code>/test_voice</code> to see if AI can recognize your voiceprint.\n\n"
         "Type /help at any time for more details."
     )
     await context.bot.send_message(
@@ -361,6 +367,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. Handle Voice Message
     if update.message.voice or update.message.audio:
+        # Check if in Identity Test Mode
+        if context.user_data.get('test_mode'):
+            return await handle_voice_test(update, context)
+            
         event_id = context.user_data.get('selected_event')
         if not event_id:
              await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Please select an event number first. Type 'Event' to list.")
@@ -454,6 +464,92 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.close()
 
 
+async def test_voice_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    # Reset state
+    if user_id in voice_test_state:
+        del voice_test_state[user_id]
+    
+    context.user_data['test_mode'] = True
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=(
+            "🧬 <b>Speaker Identity Test Mode</b>\n\n"
+            "I'm now recording your voiceprint. Please send your <b>first</b> voice message."
+        ),
+        parse_mode='HTML'
+    )
+
+async def handle_voice_test(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    file_id = update.message.voice.file_id if update.message.voice else update.message.audio.file_id
+    new_file = await context.bot.get_file(file_id)
+    file_path = f"test_{user_id}_{file_id}.ogg"
+    await new_file.download_to_drive(file_path)
+    
+    status_msg = await context.bot.send_message(chat_id=update.effective_chat.id, text="🔍 Extracting Voiceprint...")
+    
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            with open(file_path, "rb") as f:
+                 resp = await client.post("http://127.0.0.1:8001/voiceprint", files={"audio": f})
+            
+            if resp.status_code != 200:
+                raise Exception(f"AI Service Error: {resp.text}")
+                
+            embedding = resp.json().get("embedding")
+            
+            if user_id not in voice_test_state:
+                # First time recording
+                voice_test_state[user_id] = embedding
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=status_msg.message_id,
+                    text="✅ <b>First Voiceprint Recorded!</b>\n\nNow send a <b>second</b> voice message (it can be different words) to see if I recognize you.",
+                    parse_mode='HTML'
+                )
+            else:
+                # Compare
+                await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text="🔄 Comparing Identity...")
+                
+                comp_resp = await client.post(
+                    "http://127.0.0.1:8001/compare_voiceprints", 
+                    json={"embedding1": voice_test_state[user_id], "embedding2": embedding}
+                )
+                
+                if comp_resp.status_code != 200:
+                    raise Exception(f"Comparison Error: {comp_resp.text}")
+                
+                result = comp_resp.json()
+                similarity = result.get("similarity", 0)
+                matched = result.get("matched", False)
+                
+                emoji = "✅" if matched else "❌"
+                status = "<b>Identity Matched!</b>" if matched else "<b>Identity Mismatch!</b>"
+                
+                reply_text = (
+                    f"{emoji} {status}\n\n"
+                    f"<b>Similarity Score:</b> {similarity:.4f}\n"
+                    f"<b>Telegram ID:</b> <code>{user_id}</code>\n\n"
+                    f"AI now confirms: Even with different words, I know it's you based on your unique vocal cords. 🎤✨\n\n"
+                    "Type /test_voice to start over or Event to go back."
+                )
+                
+                # Exit test mode
+                context.user_data['test_mode'] = False
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=status_msg.message_id,
+                    text=reply_text,
+                    parse_mode='HTML'
+                )
+                
+    except Exception as e:
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ Error: {str(e)}")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
 if __name__ == '__main__':
     if not BOT_TOKEN:
         print("Error: BOT_TOKEN not found in .env")
@@ -465,6 +561,7 @@ if __name__ == '__main__':
     help_handler = CommandHandler('help', help_command)
     submit_handler = CommandHandler('submit', submit_url)
     report_handler = CommandHandler('report', report_command)
+    test_voice_handler = CommandHandler('test_voice', test_voice_command)
     # Generic message handler for Keywords, Numbers and Voice
     msg_handler = MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, handle_message)
     
@@ -472,6 +569,7 @@ if __name__ == '__main__':
     application.add_handler(help_handler)
     application.add_handler(submit_handler)
     application.add_handler(report_handler)
+    application.add_handler(test_voice_handler)
     application.add_handler(msg_handler)
     
     print("Bot is running...")

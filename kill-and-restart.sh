@@ -30,9 +30,6 @@ fi
 if [ -x "$CONDA_PYTHON" ]; then
   echo "Using optimized Conda python for AI: $CONDA_PYTHON"
   PYTHON_CMD="$CONDA_PYTHON"
-fi
-
-if [[ "$PYTHON_CMD" == "$CONDA_PYTHON" ]]; then
   echo "Running AI service directly with Conda environment..."
   nohup "$PYTHON_CMD" app.py > ai_service.log 2>&1 &
 else
