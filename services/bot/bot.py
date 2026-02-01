@@ -38,10 +38,29 @@ def get_db_connection():
     )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = (
+        "👋 <b>Welcome to EchoRank Bot!</b>\n\n"
+        "I am your decentralized event assistant and community sentiment analyzer.\n\n"
+        "🚀 <b>Quick Start:</b>\n"
+        "1️⃣ <b>Discover</b>: Type 'Event' or '活动' to see upcoming events.\n"
+        "2️⃣ <b>Feedback</b>: Select an event ID and send a <b>Voice Note</b>.\n"
+        "3️⃣ <b>Report</b>: Use <code>/report &lt;id&gt;</code> to see community consensus.\n\n"
+        "📥 <b>Submit an Event:</b>\n"
+        "Use <code>/submit &lt;url&gt;</code> (e.g., Luma or Eventbrite link).\n"
+        "<i>Note: Events are validated by AI based on:</i>\n"
+        "• 📍 <b>Local</b>: Takes place in Chiang Mai.\n"
+        "• 🌐 <b>Web3</b>: Related to Crypto, DAOs, or Decentralization.\n"
+        "• 🤝 <b>Co-creation</b>: Encourages participation and building.\n\n"
+        "Type /help at any time for more details."
+    )
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="👋 Welcome to EchoRank Bot!\n\nI am your decentralized event assistant.\n\n**Submit Mode:**\n/submit <url> - Add an event\n\n**Discover Mode:**\nType 'Event' or '活动' to find things to do."
+        text=help_text,
+        parse_mode='HTML'
     )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await start(update, context)
 
 import httpx
 from bs4 import BeautifulSoup
@@ -335,6 +354,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
+    # 3. Handle Fallback (Help)
+    if update.message.text:
+        await help_command(update, context)
+        return
+
     # 2. Handle Voice Message
     if update.message.voice or update.message.audio:
         event_id = context.user_data.get('selected_event')
@@ -438,12 +462,14 @@ if __name__ == '__main__':
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     
     start_handler = CommandHandler('start', start)
+    help_handler = CommandHandler('help', help_command)
     submit_handler = CommandHandler('submit', submit_url)
     report_handler = CommandHandler('report', report_command)
     # Generic message handler for Keywords, Numbers and Voice
     msg_handler = MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, handle_message)
     
     application.add_handler(start_handler)
+    application.add_handler(help_handler)
     application.add_handler(submit_handler)
     application.add_handler(report_handler)
     application.add_handler(msg_handler)
