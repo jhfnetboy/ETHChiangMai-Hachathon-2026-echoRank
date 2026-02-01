@@ -27,6 +27,17 @@
 
 ---
 
+## 🧬 3. 声纹 ID：去中心化身份验证
+### Voiceprint ID: Decentralized Identity
+
+![Voiceprint Proof](./assets/voiceprint_proof.png)
+
+*   **唯一性**: 基于 Cam++ 模型生成 192 维声纹嵌入，比指纹更难伪造。
+*   **抗攻击**: 有效防止女巫攻击（一人多号刷量），因为你无法改变声带结构。
+*   **无感验证**: 说话即登录，无需记忆密码或私钥。
+
+---
+
 ## 🎬 3. 演示流：智能审核与引导
 ### Demo Flow: AI Validation & Guidance
 
@@ -91,6 +102,14 @@
 ![The Ear](./assets/emotion_sensing_visualization_1769924507912.png)
 *   **Multimodal**: Detects tempo, laughter, and tone automatically.
 *   **Categorization**: 🎉 Excited, 🤯 Brainstorming, 🥲 Moving.
+
+---
+
+## 🧬 3. Voiceprint ID: Decentralized Identity
+![Voiceprint Proof](./assets/voiceprint_proof.png)
+*   **Unique**: Generates 192-dim embedding via Cam++ model.
+*   **Anti-Sybil**: Prevents fake accounts; you can't fake your vocal cords.
+*   **Seamless**: Speak to log in. No passwords, no keys.
 
 ---
 
