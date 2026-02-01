@@ -76,7 +76,7 @@ importers:
         specifier: ^0.16.14
         version: 0.16.14(typescript@5.9.3)
       viem:
-        specifier: 2.x
+        specifier: ~2.45.1
         version: 2.45.1(typescript@5.9.3)
 
 packages:

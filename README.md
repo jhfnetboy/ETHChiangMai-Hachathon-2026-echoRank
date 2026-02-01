@@ -16,6 +16,34 @@
   - IdentityAttestor.sol（身份与参加记录验证占位）
   - 预留 BLS + DVT 路线（后续接入签名与阈值验证）
 
+### 🧪 智能合约测试与覆盖率
+进入 `contracts` 目录运行：
+- **运行全量测试**: `forge test -vv`
+- **查看覆盖率报告**: `forge coverage --match-path "test/CommunityNFT.t.sol" --report summary`
+
+### 📜 Sepolia 链上审计报告 (Audit Report)
+当前协议已在 Sepolia 测试网完成核心基充部署：
+- **Registry (依赖项)**: [`0x7Ba70C5bFDb3A4d0cBd220534f3BE177fefc1788`](https://sepolia.etherscan.io/address/0x7Ba70C5bFDb3A4d0cBd220534f3BE177fefc1788)
+- **CommunityNFTFactory (工厂)**: [`0x1D23352390FfA1634D5eE80ebD2c5C217250d8B9`](https://sepolia.etherscan.io/address/0x1D23352390FfA1634D5eE80ebD2c5C217250d8B9)
+- **Implementation (实现)**: [`0xD18c88a9102cb61eE2361240854b83e4E6D91539`](https://sepolia.etherscan.io/address/0xD18c88a9102cb61eE2361240854b83e4E6D91539)
+
+#### 🚀 首个试点社区 (Pilot Clone)
+- **试点合约**: [`0x24BD6199c4A03737f18A7eb16B8b5aa5d9ef9E37`](https://sepolia.etherscan.io/address/0x24BD6199c4A03737f18A7eb16B8b5aa5d9ef9E37)
+- **Owner**: `0xb560...adf0E`
+- **测试记录**: 已成功在该 Clone 合约内铸造首枚验证 NFT。
+
+### 🤖 Anni 社区与 AI Agent 联合测试 (Onboarding Workflow)
+为了模拟真实业务逻辑，我们为 Anni 开通了专属社区并集成 AI Agent：
+- **Anni 社区合约**: [`0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560`](https://sepolia.etherscan.io/address/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560)
+- **原子化执行流程 (参考 script/Step1~4)**:
+    1. **社区开通**: Anni 部署属于她的 `HYBRID` 模式 NFT 合约。
+    2. **Agent 授权**: Anni 授权 AI Agent (`0xe24b...DaFA`) `MINTER_ROLE` 权限。
+    3. **亲自铸造**: 安妮为 Bob 铸造了一个**可转让**的 Token (#0)。
+    4. **Agent 铸造**: AI Agent 自动为 Bob 铸造了一个**不可转让**的 SBT (#1)。
+- **测试凭证 (On-chain Tokens)**:
+    - **Token #0 (Movable)**: 可自由由 Bob 转让。
+    - **Token #1 (Soulbound)**: 永久绑定，无法转让。全链审计可见。
+
 ## 🚀 快速开始 (生产环境/一键部署)
 
 我们推荐使用 Docker 进行一键部署，这会自动处理所有 Mac 上的环境依赖（如 `torch` 和 `llvmlite`）。
