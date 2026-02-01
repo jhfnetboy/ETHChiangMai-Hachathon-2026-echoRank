@@ -16,29 +16,26 @@
   - IdentityAttestor.sol（身份与参加记录验证占位）
   - 预留 BLS + DVT 路线（后续接入签名与阈值验证）
 
-## 快速开始
-1) 安装依赖
+## 🚀 快速开始 (生产环境/一键部署)
+
+我们推荐使用 Docker 进行一键部署，这会自动处理所有 Mac 上的环境依赖（如 `torch` 和 `llvmlite`）。
 
 ```bash
-pnpm install
-pip install -r services/ai/requirements.txt
+# 1. 克隆代码
+git clone <project_url> && cd ETHChiangMai-Hachathon-2026
+
+# 2. 运行一键式安装脚本
+chmod +x setup-production.sh
+./setup-production.sh
 ```
+按照脚本提示输入你的 `BOT_TOKEN` 和 `GEMINI_API_KEY`，即可自动启动 **数据库、AI 引擎 和 机器人**。
 
-2) 启动服务
+详细部署说明请参考：[docs/production-guide.md](./docs/production-guide.md)
 
-```bash
-# 启动 AI 服务（默认 8001）
-python3 services/ai/app.py
+---
 
-# 启动后端（默认 8000）
-pnpm dev:server
-
-# 启动前端（默认 5173）
-pnpm dev:web
-```
-
-## 开发者指南 (Manual Setup)
-如果你需要独立开发或调试各个服务，请参考以下详细步骤：
+## 🛠️ 开发者指南 (本地开发模式)
+如果你需要在此基础上进行代码修改或独立调试，可以使用 **Conda** 环境运行本地开发模式：
 
 ### 1. AI 服务 (Python FastAPI)
 位于 `services/ai` 目录。

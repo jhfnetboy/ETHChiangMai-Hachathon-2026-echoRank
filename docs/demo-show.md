@@ -7,6 +7,28 @@
 6. 一键发NFT：反馈者可以获得drop的NFT（目前Web3 account部分为模拟）
 
 
+---
+指令：
+👋 Welcome to EchoRank Bot!
+
+I am your decentralized event assistant and community sentiment analyzer.
+
+🚀 Quick Start:
+1️⃣ Discover: Type 'Event' or '活动' to see upcoming events.
+2️⃣ Feedback: Select an event ID and send a Voice Note.
+3️⃣ Report: Use /report <id> to see community consensus.
+
+📥 Submit an Event:
+Use /submit <url> (e.g., Luma or Eventbrite link).
+Note: Events are validated by AI based on:
+• 📍 Local: Takes place in Chiang Mai.
+• 🌐 Web3: Related to Crypto, DAOs, or Decentralization.
+• 🤝 Co-creation: Encourages participation and building.
+
+Type /help at any time for more details.
+
+----------
+安全和隐私：
 虽然语音分析（SenseVoice）确实是在本地跑的，但机器人在处理 非语音任务 时依然依赖 Google 的 API：
 
 网址分析（Submit 流程）：当你输入 /submit <url> 时，机器人会抓取网页内容。为了判断该活动是否符合“清迈本地、Web3、共创”这三个标准并生成摘要，它直接调用了 Google Gemini 的 API（通过 validator.py）。
@@ -120,3 +142,24 @@ EchoRank解决方案：情绪智能留言板
 · 多维分类留言墙：自动按情绪、话题、互动热度智能分类
 · 权限分层验证：链上验证参与者身份，同时开放公众留言
 · 集体记忆图谱：生成活动的情绪波动时间线
+
+-------
+
+NFT部分：
+
+社区快速发放nft，独立可运行，包括前端和输入（json输入空投地址列表，json输入nft meta data），operator支付gas（未来扩展为免gas支付）
+
+-------
+
+## 🏗️ 产品化与公共服务 (Productization)
+本项目已从实验性工具向**社区化产品**演进。详细部署指南请参考 [production-guide.md](./production-guide.md)。
+
+### 1. 核心架构：AI 服务网关
+我们采用“Hub-and-Spoke”模式，支持一个中心化的 AI Hub 支撑多个社区 Bot，降低单个社区的服务器成本。
+*   **私有模式**：社区自建全栈服务，数据 100% 物理隔离。
+*   **公共模式**：社区仅需运行一个轻量级的 Telegram Bot，接入公共 AI 算力。
+
+### 2. 部署与运维
+*   **容器化**：提供 Docker Compose 一键部署。
+*   **自动化**：集成 `kill-and-restart.sh` 运维脚本。
+*   **跨平台**：适配 Mac M 系列芯片及 Linux GPU 环境。
