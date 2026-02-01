@@ -11,6 +11,6 @@
   "license": "ISC",
   "dependencies": {
     "@aastar/sdk": "^0.16.14",
-    "viem": "2.x"
+    "viem": "~2.45.1"
   }
 }
