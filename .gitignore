@@ -154,3 +154,8 @@ bot_service.log
 # Uploads
 uploads/
 **/uploads/
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
