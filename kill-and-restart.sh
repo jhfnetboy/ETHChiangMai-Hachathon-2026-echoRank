@@ -15,6 +15,8 @@ cd "${ROOT_DIR}/services/ai"
 
 # Determine Python interpreter
 PYTHON_CMD="python3"
+CONDA_PYTHON="/usr/local/Caskroom/miniconda/base/envs/echorank_v2/bin/python"
+
 if [ -f "${ROOT_DIR}/.python-version" ]; then
   PY_VER=$(cat "${ROOT_DIR}/.python-version")
   PYENV_BIN="$HOME/.pyenv/versions/${PY_VER}/bin/python"
@@ -24,15 +26,25 @@ if [ -f "${ROOT_DIR}/.python-version" ]; then
   fi
 fi
 
-if [ ! -d ".venv" ]; then
-  echo "Creating Python venv for AI service..."
-  "$PYTHON_CMD" -m venv .venv
+# Override with Conda for AI service if available (Special case for Mac dependencies)
+if [ -x "$CONDA_PYTHON" ]; then
+  echo "Using optimized Conda python for AI: $CONDA_PYTHON"
+  PYTHON_CMD="$CONDA_PYTHON"
 fi
-# Try to install dependencies (may fail on some systems, so we allow failure for non-critical deps)
-.venv/bin/pip install -r requirements.txt >/dev/null 2>&1 || true
 
-# Start in background
-nohup .venv/bin/python app.py > ai_service.log 2>&1 &
+if [[ "$PYTHON_CMD" == "$CONDA_PYTHON" ]]; then
+  echo "Running AI service directly with Conda environment..."
+  nohup "$PYTHON_CMD" app.py > ai_service.log 2>&1 &
+else
+  if [ ! -d ".venv" ]; then
+    echo "Creating Python venv for AI service..."
+    "$PYTHON_CMD" -m venv .venv
+  fi
+  # Try to install dependencies
+  .venv/bin/pip install -r requirements.txt >/dev/null 2>&1 || true
+  # Start in background
+  nohup .venv/bin/python app.py > ai_service.log 2>&1 &
+fi
 echo "AI Service started (PID $!). Log: services/ai/ai_service.log"
 
 # 2. Restart Node backend

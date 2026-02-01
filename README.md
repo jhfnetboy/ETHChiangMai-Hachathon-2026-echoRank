@@ -129,3 +129,26 @@ python bot.py
   - AI_URL：AI 服务地址（完整 HTTP Endpoint），默认为 http://127.0.0.1:8001/analyze，可配置为外部地址
 - services/bot/.env
   - BOT_TOKEN、BACKEND_URL、BOT_NAME、Tele_URL
+
+当前系统使用的是 PostgreSQL 关系型数据库，而不是简单的本地文件（如 JSON 或 SQLite）。
+
+根据代码中的 
+services/bot/bot.py
+ 的 
+get_db_connection
+ 函数显示，系统通过 psycopg2 连接到数据库。
+
+数据库配置详情：
+数据库名: echorank_crawler
+用户名: jason (之前根据你的系统环境从 postgres 修改为了 jason)
+连接方式: 通过 TCP/IP 连接到 localhost:5432
+为什么选择 PostgreSQL 而非文件？
+并发处理: 支持机器人多用户同时提交、同时查询报告。
+数据关联: 方便将反馈表 (feedbacks) 与活动表 (activities) 通过 activity_id 进行关联查询，这对于场景 3 的 "聚合报告" 特别重要。
+持久化: 相比 JSON 文件更安全稳定，不会因为并发写入导致损坏。
+如果你想查看数据库里的数据，可以运行以下命令：
+bash
+- 查看已通过验证的活动
+psql -h localhost -d echorank_crawler -c "SELECT id, title, validation_status FROM activities;"
+- 查看提交的反馈
+psql -h localhost -d echorank_crawler -c "SELECT * FROM feedbacks;"

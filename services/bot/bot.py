@@ -6,6 +6,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Messa
 from dotenv import load_dotenv
 import psycopg2
 from urllib.parse import urlparse
+import html
 
 # Load environment variables from local .env
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -115,16 +116,20 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         emoji = "🔴" if score < 40 else ("🟡" if score < 70 else "🟢")
         cloud_str = ", ".join(cloud)
         
+        esc_title = html.escape(event_title)
+        esc_summary = html.escape(summary)
+        esc_cloud = html.escape(cloud_str)
+        
         report_text = (
-            f"📈 **Community Report: {event_title}**\n"
+            f"📈 <b>Community Report: {esc_title}</b>\n"
             f"━━━━━━━━━━━━━━━━━━━\n\n"
-            f"🌟 **Overall Score:** {emoji} {score}/100\n\n"
-            f"📝 **Summary:**\n{summary}\n\n"
-            f"☁️ **Word Cloud:**\n`{cloud_str}`\n\n"
+            f"🌟 <b>Overall Score:</b> {emoji} {score}/100\n\n"
+            f"📝 <b>Summary:</b>\n{esc_summary}\n\n"
+            f"☁️ <b>Word Cloud:</b>\n<code>{esc_cloud}</code>\n\n"
             f"👥 Based on {len(feedbacks)} participants."
         )
         
-        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=report_text, parse_mode='Markdown')
+        await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=report_text, parse_mode='HTML')
 
     except Exception as e:
         await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=f"❌ Error: {str(e)}")
@@ -229,15 +234,21 @@ async def submit_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 4. Final Reply
             tag_str = ", ".join([k for k,v in tags.items() if v])
             emoji = "✅" if is_valid else "❌"
+            
+            # Escape dynamic content
+            esc_title = html.escape(extracted_title)
+            esc_summary = html.escape(summary)
+            esc_tags = html.escape(tag_str)
+            
             final_text = (
-                f"{emoji} **Event Processed**\n"
-                f"**ID:** {activity_id}\n"
-                f"**Title:** {extracted_title}\n"
-                f"**Tags:** {tag_str}\n"
-                f"**Status:** {'Approved' if is_valid else 'Rejected (Need 2/3 tags)'}\n\n"
-                f"**Summary:** {summary}\n"
+                f"{emoji} <b>Event Processed</b>\n"
+                f"<b>ID:</b> {activity_id}\n"
+                f"<b>Title:</b> {esc_title}\n"
+                f"<b>Tags:</b> {esc_tags}\n"
+                f"<b>Status:</b> {'Approved' if is_valid else 'Rejected (Need 2/3 tags)'}\n\n"
+                f"<b>Summary:</b> {esc_summary}\n"
             )
-            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=final_text, parse_mode='Markdown')
+            await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=status_msg.message_id, text=final_text, parse_mode='HTML')
             
             
     except Exception as e:
@@ -267,14 +278,17 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=update.effective_chat.id, text="📭 No upcoming events found.")
             return
 
-        msg = "📅 **Upcoming Events**\n\n"
+        msg = "📅 <b>Upcoming Events</b>\n\n"
         for row in rows:
             # row: id, title, location, summary
-            msg += f"**{row[0]}. {row[1]}**\n📍 {row[2]}\n_{row[3]}_\n\n"
+            esc_title = html.escape(row[1])
+            esc_loc = html.escape(row[2])
+            esc_summary = html.escape(row[3])
+            msg += f"<b>{row[0]}. {esc_title}</b>\n📍 {esc_loc}\n<i>{esc_summary}</i>\n\n"
             
-        msg += "👇 **Reply with the Event ID number to give feedback.**"
+        msg += "👇 <b>Reply with the Event ID number to give feedback.</b>"
         
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=msg, parse_mode='Markdown')
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=msg, parse_mode='HTML')
         
     except Exception as e:
         await context.bot.send_message(chat_id=update.effective_chat.id, text=f"❌ Error fetching events: {str(e)}")
@@ -288,9 +302,15 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # 1. Handle Event Selection (Text Number)
-    if update.message.text and update.message.text.isdigit():
-        event_id = int(update.message.text)
+    # 1. Handle Keywords (Event / 活动)
+    if update.message.text:
+        text = update.message.text.lower().strip()
+        if text in ["event", "活动", "/list"]:
+            return await list_events(update, context)
+
+    # 2. Handle Event Selection (Text Number)
+    if update.message.text and update.message.text.strip().isdigit():
+        event_id = int(update.message.text.strip())
         # Verify event exists
         conn = get_db_connection()
         cur = conn.cursor()
@@ -301,10 +321,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if row:
             context.user_data['selected_event'] = event_id
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"✅ Selected: **{row[0]}**\n\n🎙️ Please send a **Voice Message** to share your feedback.", parse_mode='Markdown')
+            esc_title = html.escape(row[0])
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id, 
+                text=f"✅ Selected: <b>{esc_title}</b>\n\n🎙️ Please send a <b>Voice Message</b> to share your feedback.", 
+                parse_mode='HTML'
+            )
         else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Invalid Event ID. listing events again...")
-            # optional: trigger list_events?
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id, 
+                text="❌ Invalid Event ID. Type 'Event' to see the list.",
+                parse_mode='HTML'
+            )
         return
 
     # 2. Handle Voice Message
@@ -378,11 +406,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
             
             # Reply
+            esc_transcript = html.escape(ai_result['transcription'][:150])
+            esc_keywords = html.escape(", ".join(ai_result['keywords']))
+            
+            reply_text = (
+                f"✅ <b>Feedback Recorded!</b>\n\n"
+                f"💬 \"{esc_transcript}...\"\n"
+                f"😊 Sentiment: {ai_result['sentiment_score']:.2f}\n"
+                f"🏷️ Keywords: {esc_keywords}"
+            )
+            
             await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id, 
                 message_id=status_msg.message_id, 
-                text=f"✅ **Feedback Recorded!**\n\n💬 \"{ai_result['transcription'][:100]}...\"\n😊 Sentiment: {ai_result['sentiment_score']:.2f}\n🏷️ Keywords: {', '.join(ai_result['keywords'])}",
-                parse_mode='Markdown'
+                text=reply_text,
+                parse_mode='HTML'
             )
             
         except Exception as e:
@@ -402,14 +440,12 @@ if __name__ == '__main__':
     start_handler = CommandHandler('start', start)
     submit_handler = CommandHandler('submit', submit_url)
     report_handler = CommandHandler('report', report_command)
-    list_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), list_events)
-    # Generic message handler for Numbers and Voice
+    # Generic message handler for Keywords, Numbers and Voice
     msg_handler = MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, handle_message)
     
     application.add_handler(start_handler)
     application.add_handler(submit_handler)
     application.add_handler(report_handler)
-    application.add_handler(list_handler)
     application.add_handler(msg_handler)
     
     print("Bot is running...")
