@@ -73,6 +73,7 @@
     *   ![Metadata Preview](./images/metadata_preview.png)
     *   [`查看链上记录`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2)
     *   [`查看NFT`](https://sepolia.etherscan.io/token/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560?a=3)
+    *   [`Local Viewer`](file:///Users/jason/Dev/crypto-projects/launch/projects/ETHChiangMai-Hachathon-2026/docs/viewer.html)
 
 ---
 
