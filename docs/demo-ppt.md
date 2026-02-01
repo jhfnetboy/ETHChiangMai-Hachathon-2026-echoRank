@@ -73,12 +73,15 @@
 
 ---
 
-## 🛡️ 7. 隐私与价值：声纹 NFT
+## 🛡️ 7. 隐私与价值：声纹Hash + AI Agent Auto Mint NFT
 ### Privacy & Value: Voiceprint NFT
 
 *   **阅后即焚 (Burn After Reading)**: 原始音频在本地主权节点处理完后**立即物理删除**，绝不留存。
 *   **不可逆哈希 (Irreversible Hash)**: 仅上链 `Hash(声纹 + 活动ID)`。数学上保证无法反推原始声音。
 *   **情绪资产**: 这枚 NFT 证明了你不仅“到场”，而且贡献了真实的“情绪价值”。
+*   **自动铸造**: 
+    *   ![Mint Success](./images/telegram_mint.png)
+    *   [`查看链上记录`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2)
 
 ---
 
@@ -135,6 +138,10 @@
 | 3. Voice Feedback | 4. Consensus Report |
 | :---: | :---: |
 | ![Feedback](./assets/uploaded_media_0_1769924450664.png) | ![Report](./assets/uploaded_media_1_1769924450664.png) |
+
+*   **Auto-Mint**:
+    *   ![Mint Success](./images/telegram_mint.png)
+    *   [`View On-Chain`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2)
 
 ---
 
