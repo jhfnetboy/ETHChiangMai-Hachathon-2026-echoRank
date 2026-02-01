@@ -1,5 +1,8 @@
 # echoRank — ETHChiangMai-Hackathon-2026
 目标：建立社区 AI + 去中心化的社区收集与验证模式，用“人们的声音”与可验证反馈为活动与机构形成可信声誉与激励闭环。
+https://youtu.be/Yb5aJ4jrNpc
+https://x.com/jhfnetboy/status/2017949836918845593
+
 
 ## 项目结构（pnpm workspace）
 - apps/web：前端 React 单页（无登录）
