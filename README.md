@@ -88,6 +88,9 @@ python bot.py
 - 邮箱注册为占位功能，后续接入邮件服务与链上绑定
 
 ## 参考文档
+- 项目演示 PPT (Bilingual)：[docs/demo-ppt.md](./docs/demo-ppt.md)
+- 演示脚本/叙事：[docs/demo-show.md](./docs/demo-show.md)
+- 生产环境指南：[docs/production-guide.md](./docs/production-guide.md)
 - PRD：PRD-Hackathon.md
 - 技术思考：TECH-THINK.md
 
