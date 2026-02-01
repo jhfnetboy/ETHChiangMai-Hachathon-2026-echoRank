@@ -38,7 +38,7 @@
 
 ---
 
-## 🎬 3. 演示流：智能审核与引导
+## 🎬 4. 演示流：智能审核与引导
 ### Demo Flow: AI Validation & Guidance
 
 | 1. 提交活动 (Submit) | 2. AI 审核 (Approve/Reject) | 3. 新手引导 (Guide) |
@@ -50,7 +50,7 @@
 
 ---
 
-## 🎬 4. 演示流：语音反馈与报告
+## 🎬 5. 演示流：语音反馈与报告
 ### Demo Flow: Voice Feedback & Report
 
 | 3. 语音反馈 (Feedback) | 4. 共识报告 (Report) |
@@ -62,7 +62,7 @@
 
 ---
 
-## 💻 5. 主权节点：一键产品化部署
+## 💻 6. 主权节点：一键产品化部署
 ### Sovereign Node: One-Click Deployment
 
 ![Sovereign Node](./assets/mac_sovereign_node_1769924522646.png)
@@ -73,7 +73,7 @@
 
 ---
 
-## 🛡️ 6. 隐私与价值：声纹 NFT
+## 🛡️ 7. 隐私与价值：声纹 NFT
 ### Privacy & Value: Voiceprint NFT
 
 *   **阅后即焚 (Burn After Reading)**: 原始音频在本地主权节点处理完后**立即物理删除**，绝不留存。
@@ -82,8 +82,10 @@
 
 ---
 
-## 🚀 7. 未来路线图
+## 🚀 8. 未来路线图
 ### Future Roadmap
+
+![Mycelium Network](./assets/mycelium_network.png)
 
 *   **Identity**: 记录每位参与者的“情绪贡献度”。
 *   **Gasless NFT**: 自动为空投地址铸造共鸣纪念品。
@@ -122,31 +124,39 @@
 
 ---
 
-## 🎬 3. Demo Flow: Submission & Validation
+## 🎬 4. Demo Flow: Submission & Validation
 | 1. Submit Activity | 2. AI Validation (Approve/Reject) | 3. Help/Guidance |
 | :---: | :---: | :---: |
 | ![Submit](./assets/uploaded_media_2_1769924450664.png) | ![Reject](./assets/uploaded_media_3_1769924450664.png) | ![Guide](./assets/uploaded_media_4_1769924450664.png) |
 
 ---
 
-## 🎬 4. Demo Flow: Engagement & Report
+## 🎬 5. Demo Flow: Engagement & Report
 | 3. Voice Feedback | 4. Consensus Report |
 | :---: | :---: |
 | ![Feedback](./assets/uploaded_media_0_1769924450664.png) | ![Report](./assets/uploaded_media_1_1769924450664.png) |
 
 ---
 
-## 💻 5. Sovereign Node: Production Ready
+## 💻 6. Sovereign Node: Production Ready
 ![Sovereign Node](./assets/mac_sovereign_node_1769924522646.png)
 *   **One-Click**: Deploy via `setup-production.sh`.
 *   **Portable**: Fully containerized with Docker.
 
 ---
 
-## �️ 6. Privacy & Value: Voiceprint NFT
+## 🛡️ 7. Privacy & Value: Voiceprint NFT
 *   **Burn After Reading**: Raw audio is **deleted locally** immediately after processing. Never uploaded.
 *   **Irreversible Hash**: Only `Hash(Voiceprint + EventID)` is stored. Your voice data is safe.
 *   **Emotional Asset**: The NFT proves your authentic emotional contribution to the event.
+
+---
+
+## 🚀 8. Future Roadmap
+![Mycelium Network](./assets/mycelium_network.png)
+*   **Identity**: Track "Emotional Contribution" per participant.
+*   **Gasless NFT**: Auto-mint airdrops for attendees.
+*   **$EMO Token**: Incentivize authentic feedback loops.
 
 ---
 
