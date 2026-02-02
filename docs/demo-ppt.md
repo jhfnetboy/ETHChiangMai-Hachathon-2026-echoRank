@@ -1,5 +1,5 @@
 # EchoRank@communityEchoRankBot: 听见社区的心跳 🎤
-### Emotion-Aware Decentralized Message Board
+### Emotion-Aware Decentralized Message Board with On-chain Reputation SBT
 
 [跳转到英文版本 (Jump to English) ↓](#english-version)
 
