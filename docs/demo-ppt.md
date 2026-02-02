@@ -70,6 +70,7 @@
 *   **情绪资产**: 这枚 NFT 证明了你不仅“到场”，而且贡献了真实的“情绪价值”。
 *   **自动铸造 (Auto Mint)**: 
     *   ![Mint Success](./images/telegram_mint.png)
+    *   ![NFT Card Example](./assets/nft_example_card.png)
     *   ![Metadata Preview](./images/metadata_preview.png)
     *   [`查看链上记录`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2)
     *   [`查看NFT`](https://sepolia.etherscan.io/token/0x0c8EcCD5B98AfdBae8b282Ae98F4f4FFCcF9e560?a=3)
@@ -154,6 +155,7 @@
 *   **Emotional Asset**: The NFT proves your authentic emotional contribution to the event.
 *   **Auto-Mint**:
     *   ![Mint Success](./images/telegram_mint.png)
+    *   ![NFT Card Example](./assets/nft_example_card.png)
     *   ![Metadata Preview](./images/metadata_preview.png)
     *   [`View On-Chain`](https://sepolia.etherscan.io/tx/0x823755af5555be7d9d6ae5f0a9a302ca79a4c1088350738754806a8f6db4bbc2)
 

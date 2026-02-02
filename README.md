@@ -44,6 +44,9 @@
     - **Token #0 (Movable)**: 可自由由 Bob 转让。
     - **Token #1 (Soulbound)**: 永久绑定，无法转让。全链审计可见。
 
+#### 🖼️ SBT 样例 (Example)
+![NFT Example](./docs/assets/nft_example_card.png)
+
 ## 🚀 快速开始 (生产环境/一键部署)
 
 我们推荐使用 Docker 进行一键部署，这会自动处理所有 Mac 上的环境依赖（如 `torch` 和 `llvmlite`）。

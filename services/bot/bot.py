@@ -462,9 +462,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await handle_voice_test(update, context)
             
         event_id = context.user_data.get('selected_event')
+        event_id = context.user_data.get('selected_event')
         if not event_id:
              await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Please select an event number first. Type 'Event' to list.")
              return
+
+        # --- Anti-Spam Check ---
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM feedbacks WHERE user_id = %s AND activity_id = %s", (str(user_id), event_id))
+            duplicate = cur.fetchone()
+            cur.close()
+            conn.close()
+            
+            if duplicate:
+                 await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ <b>Duplicate Feedback!</b>\nYou have already submitted feedback for this event. Each person can only contribute once per event to ensure fairness.", parse_mode='HTML')
+                 return
+        except Exception as e:
+            logging.error(f"Anti-Spam Check Failed: {e}")
+            # Fail open or closed? Let's fail open but log it, or fail closed? 
+            # Ideally fail closed for anti-spam, but for demo maybe fail open. 
+            # Let's proceed if DB check fails to avoid blocking user due to system error.
+            pass
+        # -----------------------
 
         status_msg = await context.bot.send_message(chat_id=update.effective_chat.id, text="🎙️ Receiving audio...")
         
@@ -575,7 +596,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                         # Prepare paths
                         mint_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts/mint-service'))
-                        mint_script = "mint.ts" # Relative to mint_dir
+                        reputation_script = "reputation.ts"
                         
                         # Construct Metadata
                         cur.execute("SELECT title FROM activities WHERE id = %s", (event_id,))
@@ -600,9 +621,42 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         token_uri = f"data:application/json;base64,{metadata_b64}"
                         
                         try:
-                            # Use pnpm tsx to run from the service directory
+                            # Prepare ENV with corrected Private Key
+                            subprocess_env = os.environ.copy()
+                            pk = subprocess_env.get("AI_AGENT_PRIVATE_KEY", "")
+                            if pk.isdigit():
+                                try:
+                                    hex_pk = hex(int(pk))
+                                    subprocess_env["AI_AGENT_PRIVATE_KEY"] = hex_pk
+                                except Exception as e:
+                                    logging.error(f"Failed to convert AI_AGENT_PRIVATE_KEY: {e}")
+
+                            # -----------------------------------------------------
+                            # 1. Record Activity
+                            # -----------------------------------------------------
+                            cmd_record = [
+                                "pnpm", "tsx", reputation_script, "record-activity",
+                                "--user", wallet_address,
+                                "--contract", nft_contract
+                            ]
+                            logging.info(f"Running Record Activity: {' '.join(cmd_record)}")
+                            
+                            proc_record = await asyncio.create_subprocess_exec(
+                                *cmd_record,
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE,
+                                cwd=mint_dir,
+                                env=subprocess_env
+                            )
+                            out_r, err_r = await proc_record.communicate()
+                            logging.info(f"Record Activity Output: {out_r.decode().strip()}")
+                            if err_r: logging.warning(f"Record Activity Stderr: {err_r.decode().strip()}")
+
+                            # -----------------------------------------------------
+                            # 2. Mint SBT
+                            # -----------------------------------------------------
                             cmd = [
-                                "pnpm", "tsx", mint_script,
+                                "pnpm", "tsx", reputation_script, "mint",
                                 "--to", wallet_address,
                                 "--uri", token_uri,
                                 "--soulbound", "true",
